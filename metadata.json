@@ -1,0 +1,6 @@
+{
+  "name": "FlowLedger PWA — Personal Expense & Budget Tracker",
+  "description": "Offline-first Progressive Web App for personal expense tracking, paycheck-cycle budgeting, bill schedules, debt payoff, and financial data visualizations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

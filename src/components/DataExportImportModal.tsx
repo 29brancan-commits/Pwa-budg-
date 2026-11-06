@@ -13,7 +13,8 @@ import {
   loadDataFromCloudflare,
   generateCloudflareSyncShareLink,
   generateCloudflareSyncToken,
-  parseCloudflareSyncToken
+  parseCloudflareSyncToken,
+  validateCloudflareCredentials
 } from '../utils/cloudflareSync';
 import { APP_VERSION } from '../utils/version';
 import { 
@@ -115,6 +116,10 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
   const [isLoadingFromCF, setIsLoadingFromCF] = useState(false);
   const [loadCFSuccess, setLoadCFSuccess] = useState<string | null>(null);
   const [loadCFError, setLoadCFError] = useState<string | null>(null);
+
+  const [isTestingCF, setIsTestingCF] = useState(false);
+  const [cfTestSuccess, setCfTestSuccess] = useState<string | null>(null);
+  const [cfTestError, setCfTestError] = useState<string | null>(null);
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
@@ -274,6 +279,32 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
     }
     onUpdateCloudflareConfig(updated);
     return updated;
+  };
+
+  const handleTestCloudflareConnection = async () => {
+    const acc = (cfAccountId || '').trim();
+    const kv = (cfKvNamespaceId || '').trim();
+    const tok = (cfApiToken || '').trim();
+
+    if (!acc || !kv || !tok) {
+      setCfTestError('Please enter your Cloudflare Account ID, KV Namespace ID, and API Token above to test connection.');
+      return;
+    }
+
+    setIsTestingCF(true);
+    setCfTestError(null);
+    setCfTestSuccess(null);
+
+    const res = await validateCloudflareCredentials(acc, kv, tok);
+    setIsTestingCF(false);
+
+    if (res.valid) {
+      setCfTestSuccess('Cloudflare KV connection verified successfully! Credentials and permissions are valid.');
+      handleSaveCloudflareConfig(true);
+      setTimeout(() => setCfTestSuccess(null), 4000);
+    } else {
+      setCfTestError(res.error || 'Failed to verify Cloudflare credentials.');
+    }
   };
 
   const handleSaveToCloudflareNow = async () => {
@@ -1018,16 +1049,31 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
                         type={showCfToken ? 'text' : 'password'}
                         placeholder="API Token with Workers KV Storage Read/Edit permissions"
                         value={cfApiToken}
-                        onChange={(e) => setCfApiToken(e.target.value)}
-                        className="w-full pl-3 pr-10 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-orange-500"
+                        onChange={(e) => {
+                          setCfApiToken(e.target.value);
+                          setCfTestSuccess(null);
+                          setCfTestError(null);
+                        }}
+                        className="w-full pl-3 pr-20 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-orange-500"
                       />
-                      <button
-                        type="button"
-                        onClick={() => setShowCfToken(!showCfToken)}
-                        className="absolute right-2 top-1.5 text-slate-400 hover:text-slate-200"
-                      >
-                        {showCfToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
+                      <div className="absolute right-1 top-1 bottom-1 flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setShowCfToken(!showCfToken)}
+                          className="p-1 text-slate-400 hover:text-slate-200"
+                          title={showCfToken ? 'Hide token' : 'Show token'}
+                        >
+                          {showCfToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleTestCloudflareConnection}
+                          disabled={isTestingCF || !cfApiToken.trim() || !cfAccountId.trim() || !cfKvNamespaceId.trim()}
+                          className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-orange-400 font-semibold text-[10px] disabled:opacity-40 transition cursor-pointer"
+                        >
+                          {isTestingCF ? 'Testing...' : 'Verify'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1116,6 +1162,18 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
             </div>
 
             {/* Cloudflare Feedback Messages */}
+            {cfTestSuccess && (
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{cfTestSuccess}</span>
+              </div>
+            )}
+            {cfTestError && (
+              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{cfTestError}</span>
+              </div>
+            )}
             {saveCFSuccess && (
               <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />

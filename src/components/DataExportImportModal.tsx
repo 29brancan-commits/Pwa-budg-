@@ -294,7 +294,7 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
                 <span>Ready for Cloudflare Pages</span>
               </h4>
               <p className="text-[11px] text-slate-300">
-                This PWA is an offline-capable single-page application built with Vite. It compiles to static files in <code className="bg-slate-800 px-1 py-0.5 rounded text-orange-200 font-mono">dist/</code> and includes <code className="bg-slate-800 px-1 py-0.5 rounded text-orange-200 font-mono">_redirects</code> for seamless SPA routing.
+                This PWA is an offline-capable single-page application built with Vite. It compiles to static assets in <code className="bg-slate-800 px-1 py-0.5 rounded text-orange-200 font-mono">dist/</code> with native SPA routing and full offline service worker caching.
               </p>
             </div>
 

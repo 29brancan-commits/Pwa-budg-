@@ -7,6 +7,7 @@ import {
   saveDataToGitHub, 
   loadDataFromGitHub 
 } from '../utils/githubSync';
+import { APP_VERSION } from '../utils/version';
 import { 
   X, 
   Download, 
@@ -267,6 +268,9 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
             <h2 className="text-base font-bold text-white tracking-tight">
               Data Sync, GitHub & Cloudflare
             </h2>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-emerald-400 font-semibold border border-slate-700/60">
+              {APP_VERSION}
+            </span>
           </div>
           <button
             onClick={onClose}

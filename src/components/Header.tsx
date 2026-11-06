@@ -12,6 +12,7 @@ import {
   Github,
   Columns2
 } from 'lucide-react';
+import { APP_VERSION } from '../utils/version';
 
 export type ActiveTab = 'ledger' | 'charts' | 'calendar' | 'debt';
 
@@ -67,6 +68,14 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <span>FlowLedger</span>
           </a>
+
+          {/* Small Version Badge for build verification */}
+          <span
+            title={`FlowLedger Build Version ${APP_VERSION}`}
+            className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-emerald-400 select-none tracking-wide"
+          >
+            {APP_VERSION}
+          </span>
 
           {/* Month Cycle Selector */}
           <select

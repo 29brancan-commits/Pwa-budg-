@@ -53,10 +53,11 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleDualPaneMode,
 }) => {
   return (
-    <header className="sticky top-0 z-50 bg-slate-950/95 backdrop-blur-md border-b border-slate-800/80 px-3 sm:px-6 lg:px-8 pt-safe-top pb-2.5 select-none">
-      <div className="w-full max-w-[1920px] mx-auto flex items-center justify-between gap-2.5 sm:gap-4 md:gap-6">
-        {/* Zone 1: Brand Wordmark */}
-        <div className="flex items-center gap-2.5 shrink-0">
+    <header className="sticky top-0 z-50 bg-slate-950/95 backdrop-blur-md border-b border-slate-800/80 pt-safe-top pb-2 select-none w-full max-w-full overflow-hidden">
+      {/* Row 1: Brand & Month & Primary CTA */}
+      <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-6 flex items-center justify-between gap-3 pb-2 border-b border-slate-900/80">
+        {/* Left: Brand + Version + Month */}
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <a
             href="/"
             className="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2 whitespace-nowrap shrink-0 hover:text-emerald-400 transition cursor-pointer touch-manipulation"
@@ -69,7 +70,7 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="font-bold text-white text-sm sm:text-base tracking-tight">FlowLedger</span>
           </a>
 
-          {/* Small Version Badge for build verification */}
+          {/* Small Version Badge */}
           <span
             title={`FlowLedger Build Version ${APP_VERSION}`}
             className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-emerald-400 select-none tracking-wide"
@@ -91,59 +92,74 @@ export const Header: React.FC<HeaderProps> = ({
           </select>
         </div>
 
-        {/* Zone 2: Navigation Links (Single-line, text links with clean active states) */}
-        <nav className="hidden lg:flex items-center gap-4 xl:gap-5 text-xs font-medium text-slate-400">
+        {/* Right: Primary Action CTA */}
+        <div className="flex items-center gap-1.5 shrink-0 pr-1 sm:pr-2">
           <button
-            onClick={() => onSelectTab('ledger')}
-            className={`flex items-center gap-1.5 transition whitespace-nowrap shrink-0 pb-0.5 border-b-2 cursor-pointer touch-manipulation active:scale-95 ${
-              activeTab === 'ledger'
-                ? 'text-white border-emerald-500 font-semibold'
-                : 'border-transparent hover:text-slate-200'
-            }`}
+            onClick={onOpenAddModal}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition shadow-md shadow-emerald-500/20 active:scale-95 whitespace-nowrap cursor-pointer touch-manipulation"
           >
-            <ListFilter className="w-3.5 h-3.5" />
-            <span>Obligations Ledger</span>
+            <Plus className="w-4 h-4" />
+            <span className="hidden xs:inline">Add Bill</span>
           </button>
+        </div>
+      </div>
 
-          <button
-            onClick={() => onSelectTab('charts')}
-            className={`flex items-center gap-1.5 transition whitespace-nowrap shrink-0 pb-0.5 border-b-2 cursor-pointer touch-manipulation active:scale-95 ${
-              activeTab === 'charts'
-                ? 'text-white border-emerald-500 font-semibold'
-                : 'border-transparent hover:text-slate-200'
-            }`}
-          >
-            <BarChart3 className="w-3.5 h-3.5" />
-            <span>Cash Flow & Analytics</span>
-          </button>
+      {/* Row 2: Horizontally Scrollable Tab & Utility Bar (100% scrollable, zero screen extension) */}
+      <div className="w-full max-w-[1920px] mx-auto px-3 sm:px-6 pt-1.5">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth whitespace-nowrap py-0.5 max-w-full">
+          {/* Main Navigation Tabs */}
+          <div className="flex items-center gap-1 p-0.5 bg-slate-900/90 border border-slate-800/90 rounded-xl shrink-0">
+            <button
+              onClick={() => onSelectTab('ledger')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer touch-manipulation active:scale-95 whitespace-nowrap ${
+                activeTab === 'ledger'
+                  ? 'bg-emerald-500 text-slate-950 font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <ListFilter className="w-3.5 h-3.5" />
+              <span>Obligations Ledger</span>
+            </button>
 
-          <button
-            onClick={() => onSelectTab('calendar')}
-            className={`flex items-center gap-1.5 transition whitespace-nowrap shrink-0 pb-0.5 border-b-2 cursor-pointer touch-manipulation active:scale-95 ${
-              activeTab === 'calendar'
-                ? 'text-white border-emerald-500 font-semibold'
-                : 'border-transparent hover:text-slate-200'
-            }`}
-          >
-            <CalendarDays className="w-3.5 h-3.5" />
-            <span>Due Schedule</span>
-          </button>
+            <button
+              onClick={() => onSelectTab('charts')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer touch-manipulation active:scale-95 whitespace-nowrap ${
+                activeTab === 'charts'
+                  ? 'bg-emerald-500 text-slate-950 font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>Cash Flow & Analytics</span>
+            </button>
 
-          <button
-            onClick={() => onSelectTab('debt')}
-            className={`flex items-center gap-1.5 transition whitespace-nowrap shrink-0 pb-0.5 border-b-2 cursor-pointer touch-manipulation active:scale-95 ${
-              activeTab === 'debt'
-                ? 'text-white border-emerald-500 font-semibold'
-                : 'border-transparent hover:text-slate-200'
-            }`}
-          >
-            <span>Debt Snowball</span>
-          </button>
-        </nav>
+            <button
+              onClick={() => onSelectTab('calendar')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer touch-manipulation active:scale-95 whitespace-nowrap ${
+                activeTab === 'calendar'
+                  ? 'bg-emerald-500 text-slate-950 font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <CalendarDays className="w-3.5 h-3.5" />
+              <span>Due Schedule</span>
+            </button>
 
-        {/* Zone 3: Primary Action & Utilities */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 pr-1 sm:pr-3 lg:pr-6">
-          {/* Duo Dual-Screen Mode Toggle */}
+            <button
+              onClick={() => onSelectTab('debt')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition cursor-pointer touch-manipulation active:scale-95 whitespace-nowrap ${
+                activeTab === 'debt'
+                  ? 'bg-emerald-500 text-slate-950 font-bold shadow-sm'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <span>Debt Snowball</span>
+            </button>
+          </div>
+
+          <div className="w-px h-4 bg-slate-800 shrink-0 mx-0.5" />
+
+          {/* Action Utilities in the same scrollable row */}
           {onToggleDualPaneMode && (
             <button
               onClick={onToggleDualPaneMode}
@@ -152,52 +168,48 @@ export const Header: React.FC<HeaderProps> = ({
                   ? 'Dual-Screen Mode Active (Opened Duo) - Click to switch to Single-Screen (Closed Duo)'
                   : 'Switch to Dual-Screen 2-Pane View (for Opened Duo / Wide screen)'
               }
-              className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition whitespace-nowrap active:scale-95 cursor-pointer touch-manipulation ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold transition whitespace-nowrap active:scale-95 cursor-pointer touch-manipulation shrink-0 ${
                 isDualPaneMode
                   ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300 shadow-sm'
                   : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
               }`}
             >
               <Columns2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{isDualPaneMode ? 'Opened' : 'Closed'}</span>
+              <span>{isDualPaneMode ? 'Duo: Opened' : 'Duo: Closed'}</span>
             </button>
           )}
 
-          {/* Pay Periods / Bi-Weekly Cycles button */}
           {onOpenPaycheckCyclesModal && (
             <button
               onClick={onOpenPaycheckCyclesModal}
               title="Configure Paycheck Periods & Bi-Weekly Dates"
-              className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 text-xs font-semibold transition whitespace-nowrap active:scale-95 cursor-pointer touch-manipulation"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 text-xs font-semibold transition whitespace-nowrap active:scale-95 cursor-pointer touch-manipulation shrink-0"
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Periods</span>
+              <span>Pay Periods</span>
             </button>
           )}
 
-          {/* Manage Banks button */}
           {onOpenManageAccountsModal && (
             <button
               onClick={onOpenManageAccountsModal}
               title="Add or Delete Bank Accounts"
-              className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-medium transition whitespace-nowrap cursor-pointer touch-manipulation active:scale-95"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-medium transition whitespace-nowrap cursor-pointer touch-manipulation active:scale-95 shrink-0"
             >
               <Building2 className="w-3.5 h-3.5 text-purple-400" />
-              <span>Banks</span>
+              <span>Manage Banks</span>
             </button>
           )}
 
-          {/* Incomes button */}
           <button
             onClick={onOpenIncomeModal}
             title="Manage Incomes / Paychecks"
-            className="hidden md:flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-medium transition cursor-pointer touch-manipulation active:scale-95"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-medium transition cursor-pointer touch-manipulation active:scale-95 shrink-0"
           >
             <Wallet className="w-3.5 h-3.5 text-emerald-400" />
             <span>Paychecks</span>
           </button>
 
-          {/* GitHub Auto-Sync Button & Indicator */}
           <button
             onClick={() => onOpenDataModal('github')}
             title={
@@ -209,7 +221,7 @@ export const Header: React.FC<HeaderProps> = ({
                   : `GitHub Auto-Save Active ${lastSyncedCommit ? '(commit ' + lastSyncedCommit + ')' : '(synced)'}`
                 : 'Connect GitHub to auto-save data on every update'
             }
-            className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition whitespace-nowrap cursor-pointer touch-manipulation active:scale-95 ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold transition whitespace-nowrap cursor-pointer touch-manipulation active:scale-95 shrink-0 ${
               isGitHubConnected
                 ? gitHubSyncStatus === 'error'
                   ? 'bg-rose-500/15 border-rose-500/30 text-rose-300'
@@ -220,7 +232,7 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <Github className="w-3.5 h-3.5" />
-            <span className="hidden xl:inline">
+            <span>
               {isGitHubConnected
                 ? gitHubSyncStatus === 'saving'
                   ? 'Syncing...'
@@ -242,26 +254,15 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </button>
 
-          {/* Backup / Cloudflare button */}
           <button
             onClick={() => onOpenDataModal('backup')}
             title="Backup, Export & Cloudflare Hosting"
-            className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 text-xs transition cursor-pointer touch-manipulation active:scale-95"
+            className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 text-xs transition cursor-pointer touch-manipulation active:scale-95 shrink-0"
           >
             <Database className="w-3.5 h-3.5" />
           </button>
 
-          {/* In-App PWA Install Button */}
           <PWAInstallButton />
-
-          {/* Primary CTA */}
-          <button
-            onClick={onOpenAddModal}
-            className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition shadow-md shadow-emerald-500/20 active:scale-95 whitespace-nowrap cursor-pointer touch-manipulation"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Add Bill</span>
-          </button>
         </div>
       </div>
     </header>

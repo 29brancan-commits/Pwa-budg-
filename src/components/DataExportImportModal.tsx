@@ -1114,6 +1114,13 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
                       </button>
                     </div>
                   </div>
+
+                  <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-[11px] space-y-1">
+                    <span className="font-semibold text-orange-300 block">Alternative: 10-Second Worker Endpoint (No API Token Needed)</span>
+                    <p className="text-slate-400 text-[10px]">
+                      If you prefer not to manage API tokens, create a free Cloudflare Worker, bind your KV namespace as <code className="text-emerald-400 font-mono">FLOWLEDGER_KV</code>, and paste your worker URL above!
+                    </p>
+                  </div>
                 </div>
               )}
 

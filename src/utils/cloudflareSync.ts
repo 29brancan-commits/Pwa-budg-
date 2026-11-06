@@ -331,7 +331,7 @@ export async function validateCloudflareCredentials(
   if (result.resStatus === 403) {
     return {
       valid: false,
-      error: 'HTTP 403 Forbidden: Ensure your API Token has "Workers KV Storage: Edit" permission and includes your Cloudflare Account.',
+      error: 'HTTP 403 Forbidden from Cloudflare API. Please check: 1) Ensure you created an "API Token" (not Global API Key), 2) Set Permission to "Account -> Workers KV Storage -> Edit", 3) Set Account Resources to "Include -> All accounts" or account ID ' + acc + '.',
     };
   }
 

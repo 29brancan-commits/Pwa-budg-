@@ -116,6 +116,8 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
   const [loadCFSuccess, setLoadCFSuccess] = useState<string | null>(null);
   const [loadCFError, setLoadCFError] = useState<string | null>(null);
 
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
   // Sync state when modal opens or initialTab changes
   React.useEffect(() => {
     if (isOpen) {
@@ -383,8 +385,6 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
     };
     reader.readAsText(file);
   };
-
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const handleReset = () => {
     const fresh = resetToDefault();

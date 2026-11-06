@@ -30,10 +30,10 @@ export const PWAInstallButton: React.FC = () => {
       <button
         onClick={handleInstallClick}
         title="Install FlowLedger PWA"
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold tracking-wide transition-all duration-200 active:scale-95 whitespace-nowrap shrink-0"
+        className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold tracking-wide transition-all duration-200 active:scale-95 whitespace-nowrap shrink-0 cursor-pointer"
       >
         <Download className="w-3.5 h-3.5" />
-        <span>Install App</span>
+        <span className="hidden sm:inline">Install App</span>
       </button>
 
       {installedNotice && (

@@ -627,7 +627,7 @@ export default function App() {
           </div>
         ) : (
           /* Duo Closed / Single Screen Stacked Layout */
-          <div className="max-w-4xl mx-auto space-y-4">
+          <div className="w-full max-w-4xl mx-auto space-y-4">
             <section aria-label="Bank Accounts & Leftover Runway">
               <BankAccountCards
                 accounts={currentMonth.accounts}

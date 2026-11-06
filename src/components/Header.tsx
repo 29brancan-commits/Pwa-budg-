@@ -66,7 +66,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
               </svg>
             </div>
-            <span className="hidden xs:inline">FlowLedger</span>
+            <span className="font-bold text-white text-sm sm:text-base tracking-tight">FlowLedger</span>
           </a>
 
           {/* Small Version Badge for build verification */}
@@ -141,8 +141,8 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </nav>
 
-        {/* Zone 3: Primary Action & Utilities (with safe right margin for iPhone Duo status overlay) */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 pr-16 sm:pr-20 lg:pr-24">
+        {/* Zone 3: Primary Action & Utilities */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 pr-1 sm:pr-3 lg:pr-6">
           {/* Duo Dual-Screen Mode Toggle */}
           {onToggleDualPaneMode && (
             <button
@@ -159,7 +159,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <Columns2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{isDualPaneMode ? 'Duo: Opened' : 'Duo: Closed'}</span>
+              <span className="hidden sm:inline">{isDualPaneMode ? 'Opened' : 'Closed'}</span>
             </button>
           )}
 
@@ -171,7 +171,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 text-xs font-semibold transition whitespace-nowrap active:scale-95 cursor-pointer touch-manipulation"
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span className="hidden xs:inline">Pay Periods</span>
+              <span className="hidden sm:inline">Periods</span>
             </button>
           )}
 
@@ -257,10 +257,10 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Primary CTA */}
           <button
             onClick={onOpenAddModal}
-            className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition shadow-md shadow-emerald-500/20 active:scale-95 whitespace-nowrap cursor-pointer touch-manipulation"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition shadow-md shadow-emerald-500/20 active:scale-95 whitespace-nowrap cursor-pointer touch-manipulation"
           >
             <Plus className="w-4 h-4" />
-            <span className="hidden xs:inline">Add Bill</span>
+            <span className="hidden sm:inline">Add Bill</span>
           </button>
         </div>
       </div>

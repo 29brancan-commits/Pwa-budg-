@@ -10,7 +10,8 @@ import {
   Zap, 
   ArrowUpDown, 
   Plus,
-  Building2
+  Building2,
+  SlidersHorizontal
 } from 'lucide-react';
 
 interface ExpenseListProps {
@@ -24,6 +25,7 @@ interface ExpenseListProps {
   onEditExpense: (expense: ExpenseItem) => void;
   onDeleteExpense: (id: string) => void;
   onAddNew: () => void;
+  onOpenPaycheckCycles?: () => void;
   onToggleAccount?: (expenseId: string) => void;
 }
 
@@ -38,6 +40,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
   onEditExpense,
   onDeleteExpense,
   onAddNew,
+  onOpenPaycheckCycles,
   onToggleAccount,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -257,6 +260,17 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                 </button>
               </>
             )}
+
+            {onOpenPaycheckCycles && (
+              <button
+                onClick={onOpenPaycheckCycles}
+                title="Configure Pay Periods & Bi-Weekly Dates"
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold text-emerald-400 hover:text-emerald-300 hover:bg-slate-800 transition whitespace-nowrap border-l border-slate-800 pl-2"
+              >
+                <SlidersHorizontal className="w-3 h-3 text-emerald-400" />
+                <span>Edit Periods</span>
+              </button>
+            )}
           </div>
 
           {/* Category Dropdown */}
@@ -353,13 +367,24 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                     {expenses.length === 0 ? 'Add your first recurring bill or transaction to start tracking.' : 'Try adjusting your filters or search query.'}
                   </p>
                   {expenses.length === 0 && (
-                    <button
-                      onClick={onAddNew}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add First Bill</span>
-                    </button>
+                    <div className="flex items-center justify-center gap-2 flex-wrap">
+                      <button
+                        onClick={onAddNew}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add First Bill</span>
+                      </button>
+                      {onOpenPaycheckCycles && (
+                        <button
+                          onClick={onOpenPaycheckCycles}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 font-semibold text-xs border border-slate-700 transition"
+                        >
+                          <SlidersHorizontal className="w-3.5 h-3.5" />
+                          <span>Configure Pay Periods</span>
+                        </button>
+                      )}
+                    </div>
                   )}
                 </td>
               </tr>
@@ -502,13 +527,24 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
               {expenses.length === 0 ? 'Add your first recurring bill to track your bank accounts.' : 'Try adjusting your filters.'}
             </p>
             {expenses.length === 0 && (
-              <button
-                onClick={onAddNew}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add First Bill</span>
-              </button>
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <button
+                  onClick={onAddNew}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add First Bill</span>
+                </button>
+                {onOpenPaycheckCycles && (
+                  <button
+                    onClick={onOpenPaycheckCycles}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 font-semibold text-xs border border-slate-700 transition"
+                  >
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                    <span>Configure Pay Periods</span>
+                  </button>
+                )}
+              </div>
             )}
           </div>
         ) : (

@@ -132,15 +132,15 @@ export const Header: React.FC<HeaderProps> = ({
             <span>Paychecks</span>
           </button>
 
-          {/* Paycheck Cycles button */}
+          {/* Pay Periods / Bi-Weekly Cycles button */}
           {onOpenPaycheckCyclesModal && (
             <button
               onClick={onOpenPaycheckCyclesModal}
-              title="Configure Paycheck Cycles & Periods"
-              className="hidden lg:flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-medium transition"
+              title="Configure Paycheck Periods & Bi-Weekly Dates"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 text-xs font-semibold transition whitespace-nowrap active:scale-95"
             >
-              <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Cycles</span>
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>Pay Periods</span>
             </button>
           )}
 
@@ -149,7 +149,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               onClick={onOpenManageAccountsModal}
               title="Add or Delete Bank Accounts"
-              className="hidden lg:flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-medium transition"
+              className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-medium transition whitespace-nowrap"
             >
               <Building2 className="w-3.5 h-3.5 text-purple-400" />
               <span>Banks</span>

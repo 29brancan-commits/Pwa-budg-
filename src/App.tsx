@@ -373,6 +373,7 @@ export default function App() {
             currency={currency}
             onUpdateAccountBalance={handleUpdateAccountBalance}
             onOpenManageAccounts={() => setIsManageAccountsOpen(true)}
+            onOpenPaycheckCycles={() => setIsPaycheckCyclesOpen(true)}
             onDeleteAccount={handleRequestDeleteAccount}
             selectedAccountFilter={budgetState.selectedAccountFilter || 'all'}
             onSelectAccountFilter={handleSelectAccountFilter}
@@ -399,6 +400,7 @@ export default function App() {
                 setEditingExpense(null);
                 setIsAddExpenseOpen(true);
               }}
+              onOpenPaycheckCycles={() => setIsPaycheckCyclesOpen(true)}
             />
           </section>
         )}
@@ -474,6 +476,7 @@ export default function App() {
         initialExpense={editingExpense}
         accounts={currentMonth.accounts}
         paycheckCycles={currentMonth.paycheckCycles}
+        onOpenPaycheckCycles={() => setIsPaycheckCyclesOpen(true)}
         currency={currency}
       />
 
@@ -485,6 +488,7 @@ export default function App() {
         accounts={currentMonth.accounts}
         paycheckCycles={currentMonth.paycheckCycles}
         onSaveIncomes={handleSaveIncomes}
+        onOpenPaycheckCycles={() => setIsPaycheckCyclesOpen(true)}
         currency={currency}
       />
 

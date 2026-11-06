@@ -9,6 +9,7 @@ interface IncomeManagerModalProps {
   accounts: BankAccount[];
   paycheckCycles: PaycheckCycle[];
   onSaveIncomes: (incomes: IncomeItem[]) => void;
+  onOpenPaycheckCycles?: () => void;
   currency?: string;
 }
 
@@ -19,6 +20,7 @@ export const IncomeManagerModal: React.FC<IncomeManagerModalProps> = ({
   accounts,
   paycheckCycles,
   onSaveIncomes,
+  onOpenPaycheckCycles,
   currency = '$',
 }) => {
   const [items, setItems] = useState<IncomeItem[]>(incomes);
@@ -72,12 +74,27 @@ export const IncomeManagerModal: React.FC<IncomeManagerModalProps> = ({
               Paycheck & Income Inflows
             </h2>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {onOpenPaycheckCycles && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenPaycheckCycles();
+                }}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold transition"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                <span>Edit Pay Periods</span>
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         <p className="text-xs text-slate-400 mt-2">

@@ -11,7 +11,8 @@ import {
   ChevronUp,
   Plus,
   Trash2,
-  Settings2
+  Settings2,
+  SlidersHorizontal
 } from 'lucide-react';
 
 interface BankAccountCardsProps {
@@ -21,6 +22,7 @@ interface BankAccountCardsProps {
   currency?: string;
   onUpdateAccountBalance: (accountId: string, newBalance: number) => void;
   onOpenManageAccounts: () => void;
+  onOpenPaycheckCycles?: () => void;
   onDeleteAccount: (accountId: string) => void;
   selectedAccountFilter: string;
   onSelectAccountFilter: (accountId: string) => void;
@@ -33,6 +35,7 @@ export const BankAccountCards: React.FC<BankAccountCardsProps> = ({
   currency = '$',
   onUpdateAccountBalance,
   onOpenManageAccounts,
+  onOpenPaycheckCycles,
   onDeleteAccount,
   selectedAccountFilter,
   onSelectAccountFilter,
@@ -159,6 +162,17 @@ export const BankAccountCards: React.FC<BankAccountCardsProps> = ({
             <Plus className="w-3.5 h-3.5" />
             <span>Manage Banks</span>
           </button>
+
+          {onOpenPaycheckCycles && (
+            <button
+              onClick={onOpenPaycheckCycles}
+              title="Configure Paycheck Periods & Bi-Weekly Dates"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold transition"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>Pay Periods</span>
+            </button>
+          )}
 
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}

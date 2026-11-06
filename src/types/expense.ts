@@ -13,9 +13,10 @@ export type ExpenseCategory =
 
 export interface PaycheckCycle {
   id: string; // e.g. "cycle-1", "cycle-2"
-  label: string; // e.g. "1st Half (5th–18th)"
+  label: string; // e.g. "1st Half (5th–18th)" or "Paycheck 1 (Nov 6 – Nov 19)"
   startDay: number; // e.g. 5
   endDay: number; // e.g. 18
+  startDate?: string; // Optional exact anchor date (YYYY-MM-DD)
 }
 
 export interface BankAccount {

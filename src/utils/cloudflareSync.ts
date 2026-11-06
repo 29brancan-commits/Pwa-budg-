@@ -260,7 +260,7 @@ async function executeCloudflareKVFetch(params: {
       resStatus: 0,
       isNetworkError: true,
       error: isTypeError
-        ? 'Network / CORS Error: Direct browser requests to Cloudflare API (api.cloudflare.com) were blocked by browser CORS policy. Please make sure the app is running with dev/start server or use Worker Endpoint mode.'
+        ? 'CORS / Network Error: Direct browser fetch to api.cloudflare.com was blocked. Run "npx wrangler deploy" in your terminal to publish our included _worker.js proxy to your Workers domain!'
         : `Network Error: ${msg}`,
     };
   }

@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { BudgetState, ExpenseItem, IncomeItem, BudgetMonth, ExpenseStatus, BankAccount, PaycheckCycle } from './types/expense';
-import { loadBudgetState, saveBudgetState } from './utils/storage';
+import { loadBudgetState, saveBudgetState, loadFromIndexedDB } from './utils/storage';
 import { 
   GitHubConfig, 
   loadGitHubConfig, 
   saveGitHubConfig, 
-  saveDataToGitHub 
+  saveDataToGitHub,
+  loadDataFromGitHub
 } from './utils/githubSync';
 import { Header, ActiveTab } from './components/Header';
 import { MobileBottomNav } from './components/MobileBottomNav';
@@ -54,7 +55,6 @@ export default function App() {
 
   useEffect(() => {
     const handleViewportChange = () => {
-      // Auto-detect unfolded Duo or wide screen unless user explicitly set override
       if (manualDualPaneOverride.current === null) {
         const isSpanned = window.matchMedia?.('(horizontal-viewport-segments: 2), (screen-spanning: single-fold-vertical)')?.matches;
         const shouldBeDual = Boolean(isSpanned || window.innerWidth >= 850);
@@ -67,6 +67,67 @@ export default function App() {
     return () => {
       window.removeEventListener('resize', handleViewportChange);
       window.removeEventListener('orientationchange', handleViewportChange);
+    };
+  }, []);
+
+  // Asynchronous hydration from IndexedDB, localStorage storage events, and GitHub sync
+  useEffect(() => {
+    // 1. Asynchronously check IndexedDB
+    loadFromIndexedDB('budget_state').then((idbState) => {
+      if (idbState && idbState.months && idbState.currentMonthId) {
+        setBudgetState((prevState) => {
+          const prevHasExpenses = Object.values(prevState.months).some((m) => m.expenses && m.expenses.length > 0);
+          const idbHasExpenses = Object.values(idbState.months).some((m: any) => m.expenses && m.expenses.length > 0);
+          if (!prevHasExpenses || idbHasExpenses) {
+            saveBudgetState(idbState);
+            return idbState;
+          }
+          return prevState;
+        });
+      }
+    });
+
+    // 2. Listen to cross-window BroadcastChannel and StorageEvent for instant sync
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key && e.key.startsWith('flowledger_budget_state')) {
+        const reloaded = loadBudgetState();
+        setBudgetState(reloaded);
+      }
+      if (e.key === 'flowledger_github_config_v1') {
+        setGitHubConfig(loadGitHubConfig());
+      }
+    };
+
+    let channel: BroadcastChannel | null = null;
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        channel = new BroadcastChannel('flowledger_pwa_channel');
+        channel.onmessage = (evt) => {
+          if (evt.data && evt.data.type === 'STATE_UPDATED' && evt.data.state) {
+            setBudgetState(evt.data.state);
+          }
+        };
+      } catch (e) {
+        // Ignore
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange);
+
+    // 3. Auto-load latest state from GitHub if token & repo configured
+    if (gitHubConfig.enabled && gitHubConfig.token && gitHubConfig.owner && gitHubConfig.repo) {
+      loadDataFromGitHub(gitHubConfig).then((res) => {
+        if (res.success && res.state) {
+          setBudgetState(res.state);
+          saveBudgetState(res.state);
+          setGitHubSyncStatus('synced');
+        }
+      });
+    }
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      if (channel) channel.close();
     };
   }, []);
 

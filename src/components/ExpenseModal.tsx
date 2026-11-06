@@ -27,7 +27,7 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
 }) => {
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState<string>('');
-  const [dueDate, setDueDate] = useState<number>(1);
+  const [dueDate, setDueDate] = useState<string>('');
   const [payPeriod, setPayPeriod] = useState<string>('both');
   const [status, setStatus] = useState<ExpenseStatus>('due');
   const [autoPay, setAutoPay] = useState(false);
@@ -39,7 +39,7 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
     if (initialExpense) {
       setTitle(initialExpense.title);
       setAmount(initialExpense.amount.toString());
-      setDueDate(initialExpense.dueDate);
+      setDueDate(initialExpense.dueDate.toString());
       setPayPeriod(initialExpense.payPeriod);
       setStatus(initialExpense.status);
       setAutoPay(initialExpense.autoPay);
@@ -49,7 +49,7 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
     } else {
       setTitle('');
       setAmount('');
-      setDueDate(1);
+      setDueDate('');
       setPayPeriod(paycheckCycles[0]?.id || 'cycle-1');
       setStatus('due');
       setAutoPay(false);
@@ -62,9 +62,13 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
   if (!isOpen) return null;
 
   // Auto-match paycheck cycle when due day is entered (if not set to 'both')
-  const handleDueDayChange = (day: number) => {
+  const handleDueDayChange = (valStr: string) => {
+    setDueDate(valStr);
+    if (!valStr) return;
+    const day = parseInt(valStr, 10);
+    if (isNaN(day)) return;
+
     const validDay = Math.min(31, Math.max(1, day));
-    setDueDate(validDay);
 
     // Find cycle that covers this day
     const matchingCycle = paycheckCycles.find((c) => {
@@ -84,13 +88,14 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const numAmount = parseFloat(amount);
-    if (!title.trim() || isNaN(numAmount) || numAmount < 0) return;
+    const parsedDay = parseInt(dueDate, 10);
+    if (!title.trim() || isNaN(numAmount) || numAmount < 0 || isNaN(parsedDay)) return;
 
     const expenseItem: ExpenseItem = {
       id: initialExpense ? initialExpense.id : `exp-${Date.now()}`,
       title: title.trim(),
       amount: numAmount,
-      dueDate: Math.min(31, Math.max(1, Number(dueDate))),
+      dueDate: Math.min(31, Math.max(1, parsedDay)),
       payPeriod,
       status,
       autoPay,
@@ -113,7 +118,7 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
           </h2>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -171,15 +176,16 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
           {/* Due Date & Paycheck Cycle Assignment */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block font-medium text-slate-300 mb-1">Due Day of Month (1 - 31)</label>
+              <label className="block font-medium text-slate-300 mb-1">Due Day of Month (1 - 31) *</label>
               <input
                 type="number"
                 min="1"
                 max="31"
                 required
+                placeholder="e.g. 5, 15, 28"
                 value={dueDate}
-                onChange={(e) => handleDueDayChange(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl bg-slate-800/80 border border-slate-700/80 text-white font-mono focus:outline-none focus:border-emerald-500"
+                onChange={(e) => handleDueDayChange(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-800/80 border border-slate-700/80 text-white font-mono placeholder-slate-500 focus:outline-none focus:border-emerald-500"
               />
             </div>
 

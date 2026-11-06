@@ -170,8 +170,8 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={onToggleDualPaneMode}
               title={
                 isDualPaneMode
-                  ? 'Dual-Screen Mode Active (Opened Duo) - Click to switch to Single-Screen (Closed Duo)'
-                  : 'Switch to Dual-Screen 2-Pane View (for Opened Duo / Wide screen)'
+                  ? 'iPhone Duo Opened (2-Screen View) - Click to switch to Closed single-screen'
+                  : 'iPhone Duo Closed (Single Screen View) - Click to switch to Opened dual-screen'
               }
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold transition whitespace-nowrap active:scale-95 cursor-pointer touch-manipulation shrink-0 ${
                 isDualPaneMode
@@ -179,8 +179,8 @@ export const Header: React.FC<HeaderProps> = ({
                   : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
               }`}
             >
-              <Columns2 className="w-3.5 h-3.5" />
-              <span>{isDualPaneMode ? 'Duo: Opened' : 'Duo: Closed'}</span>
+              <Columns2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{isDualPaneMode ? 'Duo: Opened 📖' : 'Duo: Closed 📱'}</span>
             </button>
           )}
 

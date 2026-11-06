@@ -582,7 +582,12 @@ export default function App() {
       <main className="flex-1 w-full max-w-[1920px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-5 pb-24 md:pb-12">
         {/* Duo Opened Dual-Screen Layout (Side-by-Side 2-Screen Panels) */}
         {isDualPaneMode ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 xl:gap-12 items-start w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 xl:gap-12 items-start w-full relative">
+            {/* Subtle Vertical Hinge Seam for Opened Dual-Screen Devices */}
+            <div className="hidden lg:block absolute left-1/2 top-0 bottom-0 -ml-5 w-10 pointer-events-none flex items-center justify-center opacity-30">
+              <div className="h-full w-px bg-gradient-to-b from-emerald-500/0 via-slate-700 to-emerald-500/0" />
+            </div>
+
             {/* Screen 1 (Left Display): Bank Accounts & Leftover Runway Command Center */}
             <div className="space-y-4">
               <div className="flex items-center justify-between pb-1">

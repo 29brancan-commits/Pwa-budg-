@@ -205,9 +205,9 @@ export async function saveDataToCloudflare(
 
   // Mode 1: Cloudflare KV REST API Direct
   if (config.mode === 'kv') {
-    const accountId = config.accountId.trim();
-    const namespaceId = config.kvNamespaceId.trim();
-    const token = config.apiToken.trim();
+    const accountId = (config.accountId || '').trim();
+    const namespaceId = (config.kvNamespaceId || '').trim();
+    const token = (config.apiToken || '').trim();
 
     if (!accountId || !namespaceId || !token) {
       return { success: false, error: 'Cloudflare Account ID, KV Namespace ID, and API Token are required.' };
@@ -243,20 +243,53 @@ export async function saveDataToCloudflare(
 
   // Mode 2: Custom Cloudflare Worker Endpoint
   if (config.mode === 'worker_endpoint') {
-    const endpoint = config.workerEndpoint.trim();
+    const endpoint = (config.workerEndpoint || '').trim();
     if (!endpoint) {
       return { success: false, error: 'Cloudflare Worker Endpoint URL is required.' };
     }
 
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(config.apiToken ? { Authorization: `Bearer ${config.apiToken.trim()}` } : {}),
+    };
+
+    const payloadWrapped = JSON.stringify({ key: syncKey, data: state, state });
+    const payloadRaw = JSON.stringify(state);
+
     try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(config.apiToken ? { Authorization: `Bearer ${config.apiToken.trim()}` } : {}),
-        },
-        body: JSON.stringify({ key: syncKey, data: state }),
+      // Attempt 1: PUT with wrapped payload (Standard REST / KV proxy)
+      let res = await fetch(endpoint, {
+        method: 'PUT',
+        headers,
+        body: payloadWrapped,
       });
+
+      // Attempt 2: If 405 Method Not Allowed, try POST with wrapped payload
+      if (res.status === 405) {
+        res = await fetch(endpoint, {
+          method: 'POST',
+          headers,
+          body: payloadWrapped,
+        });
+      }
+
+      // Attempt 3: If 400 or 422, try raw state payload with PUT
+      if (res.status === 400 || res.status === 422) {
+        res = await fetch(endpoint, {
+          method: 'PUT',
+          headers,
+          body: payloadRaw,
+        });
+      }
+
+      // Attempt 4: If still 405, try POST with raw state payload
+      if (res.status === 405) {
+        res = await fetch(endpoint, {
+          method: 'POST',
+          headers,
+          body: payloadRaw,
+        });
+      }
 
       if (!res.ok) {
         return { success: false, error: `Worker Endpoint HTTP ${res.status}: ${res.statusText}` };
@@ -289,9 +322,9 @@ export async function loadDataFromCloudflare(
 
   // Mode 1: Cloudflare KV REST API Direct
   if (config.mode === 'kv') {
-    const accountId = config.accountId.trim();
-    const namespaceId = config.kvNamespaceId.trim();
-    const token = config.apiToken.trim();
+    const accountId = (config.accountId || '').trim();
+    const namespaceId = (config.kvNamespaceId || '').trim();
+    const token = (config.apiToken || '').trim();
 
     if (!accountId || !namespaceId || !token) {
       return { success: false, error: 'Cloudflare Account ID, KV Namespace ID, and API Token are required.' };
@@ -329,25 +362,37 @@ export async function loadDataFromCloudflare(
 
   // Mode 2: Worker Endpoint
   if (config.mode === 'worker_endpoint') {
-    const endpoint = config.workerEndpoint.trim();
+    const endpoint = (config.workerEndpoint || '').trim();
     if (!endpoint) {
       return { success: false, error: 'Cloudflare Worker Endpoint URL is required.' };
     }
 
+    const headers: Record<string, string> = {
+      ...(config.apiToken ? { Authorization: `Bearer ${config.apiToken.trim()}` } : {}),
+    };
+
     try {
-      const url = `${endpoint}?key=${encodeURIComponent(syncKey)}&_t=${Date.now()}`;
-      const res = await fetch(url, {
-        headers: {
-          ...(config.apiToken ? { Authorization: `Bearer ${config.apiToken.trim()}` } : {}),
-        },
-      });
+      const url = endpoint.includes('?')
+        ? `${endpoint}&key=${encodeURIComponent(syncKey)}&_t=${Date.now()}`
+        : `${endpoint}?key=${encodeURIComponent(syncKey)}&_t=${Date.now()}`;
+
+      let res = await fetch(url, { headers });
+
+      // If GET returns 405 Method Not Allowed, try POST
+      if (res.status === 405) {
+        res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'load', key: syncKey }),
+        });
+      }
 
       if (!res.ok) {
         return { success: false, error: `Worker Endpoint HTTP ${res.status}: ${res.statusText}` };
       }
 
       const parsedState = await res.json();
-      const state = parsedState.data || parsedState;
+      const state = parsedState.data || parsedState.state || parsedState;
       if (!state || !state.months || !state.currentMonthId) {
         return { success: false, error: 'Worker endpoint returned invalid state format.' };
       }

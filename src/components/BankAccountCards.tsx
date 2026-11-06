@@ -42,8 +42,8 @@ export const BankAccountCards: React.FC<BankAccountCardsProps> = ({
   onSelectAccountFilter,
   forceExpanded = false,
 }) => {
-  // Collapse by default unless forceExpanded (e.g. Duo Dual-Screen opened mode)
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(!forceExpanded);
+  // Expand by default so full starting balances and leftover runways are immediately visible
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
   const [editBalanceValue, setEditBalanceValue] = useState<string>('');
 

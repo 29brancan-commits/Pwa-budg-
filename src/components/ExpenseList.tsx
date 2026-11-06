@@ -287,10 +287,10 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
             ))}
           </select>
 
-          {/* Add New Button */}
+          {/* Add New Button (shown on sm+ screens; on mobile the top header button serves this) */}
           <button
             onClick={onAddNew}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition shadow-md shadow-emerald-500/20 shrink-0 active:scale-95 whitespace-nowrap"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition shadow-md shadow-emerald-500/20 shrink-0 active:scale-95 whitespace-nowrap cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add Bill</span>

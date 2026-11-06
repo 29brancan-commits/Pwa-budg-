@@ -116,32 +116,60 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
   const [loadCFSuccess, setLoadCFSuccess] = useState<string | null>(null);
   const [loadCFError, setLoadCFError] = useState<string | null>(null);
 
+  // Sync state when modal opens or initialTab changes
+  React.useEffect(() => {
+    if (isOpen) {
+      if (initialTab) setActiveTab(initialTab);
+      if (cloudflareConfig) {
+        setCfEnabled(Boolean(cloudflareConfig.enabled));
+        setCfMode(cloudflareConfig.mode || 'kv');
+        setCfAccountId(cloudflareConfig.accountId || '');
+        setCfKvNamespaceId(cloudflareConfig.kvNamespaceId || '');
+        setCfApiToken(cloudflareConfig.apiToken || '');
+        setCfWorkerEndpoint(cloudflareConfig.workerEndpoint || '');
+        setCfSyncKey(cloudflareConfig.syncKey || 'flowledger_budget_data');
+        setCfAutoSave(cloudflareConfig.autoSave ?? true);
+      }
+      if (gitHubConfig) {
+        setGhToken(gitHubConfig.token || '');
+        setGhOwner(gitHubConfig.owner || '');
+        setGhRepo(gitHubConfig.repo || 'pwa-budgv2');
+        setGhBranch(gitHubConfig.branch || 'main');
+        setGhFilePath(gitHubConfig.filePath || 'data/flowledger-data.json');
+        setGhAutoSave(gitHubConfig.autoSave ?? true);
+        setGhSkipCi(gitHubConfig.skipCi ?? true);
+      }
+    }
+  }, [isOpen, initialTab, cloudflareConfig, gitHubConfig]);
+
   if (!isOpen) return null;
 
   const handleTestGitHubConnection = async () => {
-    if (!ghToken.trim()) {
+    const tok = (ghToken || '').trim();
+    if (!tok) {
       setVerifyError('Please enter a GitHub Personal Access Token.');
       return;
     }
     setIsVerifying(true);
     setVerifyError(null);
     setVerifiedUser(null);
-    const res = await validateGitHubToken(ghToken);
+    const res = await validateGitHubToken(tok);
     setIsVerifying(false);
     if (res.valid && res.username) {
       setVerifiedUser(res.username);
       setVerifiedAvatar(res.avatarUrl || null);
+      const own = (ghOwner || '').trim() || res.username;
       if (!ghOwner) {
         setGhOwner(res.username);
       }
       const updated: GitHubConfig = {
         ...gitHubConfig,
         enabled: true,
-        token: ghToken.trim(),
-        owner: ghOwner || res.username,
-        repo: ghRepo.trim(),
-        branch: ghBranch.trim() || 'main',
-        filePath: ghFilePath.trim() || 'data/flowledger-data.json',
+        token: tok,
+        owner: own,
+        repo: (ghRepo || '').trim(),
+        branch: (ghBranch || '').trim() || 'main',
+        filePath: (ghFilePath || '').trim() || 'data/flowledger-data.json',
         autoSave: ghAutoSave,
         skipCi: ghSkipCi,
       };
@@ -152,14 +180,20 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
   };
 
   const handleSaveConfig = () => {
+    const tok = (ghToken || '').trim();
+    const own = ((ghOwner || '').trim() || verifiedUser || '').trim();
+    const rep = (ghRepo || '').trim();
+    const br = (ghBranch || '').trim();
+    const fp = (ghFilePath || '').trim();
+
     const updated: GitHubConfig = {
       ...gitHubConfig,
-      enabled: Boolean(ghToken.trim() && (ghOwner.trim() || verifiedUser) && ghRepo.trim()),
-      token: ghToken.trim(),
-      owner: (ghOwner.trim() || verifiedUser || '').trim(),
-      repo: ghRepo.trim(),
-      branch: ghBranch.trim() || 'main',
-      filePath: ghFilePath.trim() || 'data/flowledger-data.json',
+      enabled: Boolean(tok && own && rep),
+      token: tok,
+      owner: own,
+      repo: rep,
+      branch: br || 'main',
+      filePath: fp || 'data/flowledger-data.json',
       autoSave: ghAutoSave,
       skipCi: ghSkipCi,
     };
@@ -214,19 +248,25 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
 
   // Save Cloudflare configuration helper
   const handleSaveCloudflareConfig = () => {
+    const accId = (cfAccountId || '').trim();
+    const kvId = (cfKvNamespaceId || '').trim();
+    const token = (cfApiToken || '').trim();
+    const endpoint = (cfWorkerEndpoint || '').trim();
+    const key = (cfSyncKey || '').trim();
+
     const isConfigValid = cfMode === 'kv' 
-      ? Boolean(cfAccountId.trim() && cfKvNamespaceId.trim() && cfApiToken.trim())
-      : Boolean(cfWorkerEndpoint.trim());
+      ? Boolean(accId && kvId && token)
+      : Boolean(endpoint);
 
     const updated: CloudflareConfig = {
       ...cloudflareConfig,
       enabled: cfEnabled && isConfigValid,
-      mode: cfMode,
-      accountId: cfAccountId.trim(),
-      kvNamespaceId: cfKvNamespaceId.trim(),
-      apiToken: cfApiToken.trim(),
-      workerEndpoint: cfWorkerEndpoint.trim(),
-      syncKey: cfSyncKey.trim() || 'flowledger_budget_data',
+      mode: cfMode || 'kv',
+      accountId: accId,
+      kvNamespaceId: kvId,
+      apiToken: token,
+      workerEndpoint: endpoint,
+      syncKey: key || 'flowledger_budget_data',
       autoSave: cfAutoSave,
     };
     onUpdateCloudflareConfig(updated);

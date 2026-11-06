@@ -249,20 +249,18 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
   };
 
   // Save Cloudflare configuration helper
-  const handleSaveCloudflareConfig = () => {
+  const handleSaveCloudflareConfig = (forceEnable = false) => {
     const accId = (cfAccountId || '').trim();
     const kvId = (cfKvNamespaceId || '').trim();
     const token = (cfApiToken || '').trim();
     const endpoint = (cfWorkerEndpoint || '').trim();
     const key = (cfSyncKey || '').trim();
 
-    const isConfigValid = cfMode === 'kv' 
-      ? Boolean(accId && kvId && token)
-      : Boolean(endpoint);
+    const isEnabled = forceEnable || cfEnabled;
 
     const updated: CloudflareConfig = {
       ...cloudflareConfig,
-      enabled: cfEnabled && isConfigValid,
+      enabled: isEnabled,
       mode: cfMode || 'kv',
       accountId: accId,
       kvNamespaceId: kvId,
@@ -271,12 +269,28 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
       syncKey: key || 'flowledger_budget_data',
       autoSave: cfAutoSave,
     };
+    if (isEnabled !== cfEnabled) {
+      setCfEnabled(isEnabled);
+    }
     onUpdateCloudflareConfig(updated);
     return updated;
   };
 
   const handleSaveToCloudflareNow = async () => {
-    const currentConfig = handleSaveCloudflareConfig();
+    const currentConfig = handleSaveCloudflareConfig(true);
+
+    if (currentConfig.mode === 'kv') {
+      if (!currentConfig.accountId || !currentConfig.kvNamespaceId || !currentConfig.apiToken) {
+        setSaveCFError('Please enter your Cloudflare Account ID, KV Namespace ID, and API Token above.');
+        return;
+      }
+    } else if (currentConfig.mode === 'worker_endpoint') {
+      if (!currentConfig.workerEndpoint) {
+        setSaveCFError('Please enter your Cloudflare Worker Endpoint URL above.');
+        return;
+      }
+    }
+
     setIsSavingToCF(true);
     setSaveCFError(null);
     setSaveCFSuccess(null);
@@ -294,7 +308,20 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
   };
 
   const handleLoadFromCloudflareNow = async () => {
-    const currentConfig = handleSaveCloudflareConfig();
+    const currentConfig = handleSaveCloudflareConfig(true);
+
+    if (currentConfig.mode === 'kv') {
+      if (!currentConfig.accountId || !currentConfig.kvNamespaceId || !currentConfig.apiToken) {
+        setLoadCFError('Please enter your Cloudflare Account ID, KV Namespace ID, and API Token above.');
+        return;
+      }
+    } else if (currentConfig.mode === 'worker_endpoint') {
+      if (!currentConfig.workerEndpoint) {
+        setLoadCFError('Please enter your Cloudflare Worker Endpoint URL above.');
+        return;
+      }
+    }
+
     setIsLoadingFromCF(true);
     setLoadCFError(null);
     setLoadCFSuccess(null);
@@ -923,9 +950,20 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
                 <div className="space-y-3 pt-1">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block font-medium text-slate-300 mb-1">
-                        Cloudflare Account ID *
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="font-medium text-slate-300">
+                          Cloudflare Account ID *
+                        </label>
+                        <a
+                          href="https://dash.cloudflare.com"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-orange-400 hover:text-orange-300 flex items-center gap-0.5 underline font-medium"
+                        >
+                          <span>Open Dashboard</span>
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      </div>
                       <input
                         type="text"
                         placeholder="e.g. 4a8b...99"
@@ -936,9 +974,20 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
                     </div>
 
                     <div>
-                      <label className="block font-medium text-slate-300 mb-1">
-                        KV Namespace ID *
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="font-medium text-slate-300">
+                          KV Namespace ID *
+                        </label>
+                        <a
+                          href="https://dash.cloudflare.com/?to=/:account/workers/kv/namespaces"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-orange-400 hover:text-orange-300 flex items-center gap-0.5 underline font-medium"
+                        >
+                          <span>Open KV Page</span>
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      </div>
                       <input
                         type="text"
                         placeholder="e.g. 81f3...c2"
@@ -950,9 +999,20 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
                   </div>
 
                   <div>
-                    <label className="block font-medium text-slate-300 mb-1">
-                      Cloudflare API Token *
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="font-medium text-slate-300">
+                        Cloudflare API Token *
+                      </label>
+                      <a
+                        href="https://dash.cloudflare.com/profile/api-tokens"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-orange-400 hover:text-orange-300 flex items-center gap-0.5 underline font-medium"
+                      >
+                        <span>Create Token (Edit KV)</span>
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    </div>
                     <div className="relative">
                       <input
                         type={showCfToken ? 'text' : 'password'}

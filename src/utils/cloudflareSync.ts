@@ -188,7 +188,7 @@ export async function saveDataToCloudflare(
   state: BudgetState
 ): Promise<{ success: boolean; syncedAt?: string; error?: string }> {
   if (!config.enabled) {
-    return { success: false, error: 'Cloudflare Sync is not enabled.' };
+    return { success: false, error: 'Cloudflare Sync is disabled. Please check "Enable Cloudflare Sync" above to activate.' };
   }
 
   const syncKey = (config.syncKey || 'flowledger_budget_data').trim();

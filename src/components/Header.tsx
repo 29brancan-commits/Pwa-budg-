@@ -8,7 +8,8 @@ import {
   CalendarDays, 
   ListFilter,
   Building2,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Github
 } from 'lucide-react';
 
 export type ActiveTab = 'ledger' | 'charts' | 'calendar' | 'debt';
@@ -18,13 +19,16 @@ interface HeaderProps {
   onSelectTab: (tab: ActiveTab) => void;
   onOpenAddModal: () => void;
   onOpenIncomeModal: () => void;
-  onOpenDataModal: () => void;
+  onOpenDataModal: (initialTab?: 'github' | 'backup' | 'cloudflare') => void;
   onOpenPaycheckCyclesModal?: () => void;
   onOpenManageAccountsModal?: () => void;
   currentMonthLabel: string;
   availableMonths: { id: string; label: string }[];
   currentMonthId: string;
   onSelectMonth: (monthId: string) => void;
+  gitHubSyncStatus?: 'idle' | 'saving' | 'synced' | 'error';
+  isGitHubConnected?: boolean;
+  lastSyncedCommit?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -38,6 +42,9 @@ export const Header: React.FC<HeaderProps> = ({
   availableMonths,
   currentMonthId,
   onSelectMonth,
+  gitHubSyncStatus = 'idle',
+  isGitHubConnected = false,
+  lastSyncedCommit,
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-4 lg:px-8 py-3 pt-safe">
@@ -156,9 +163,54 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
+          {/* GitHub Auto-Sync Button & Indicator */}
+          <button
+            onClick={() => onOpenDataModal('github')}
+            title={
+              isGitHubConnected
+                ? gitHubSyncStatus === 'saving'
+                  ? 'Saving changes to GitHub...'
+                  : gitHubSyncStatus === 'error'
+                  ? 'GitHub sync error - click to fix'
+                  : `GitHub Auto-Save Active ${lastSyncedCommit ? '(commit ' + lastSyncedCommit + ')' : '(synced)'}`
+                : 'Connect GitHub to auto-save data on every update'
+            }
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition whitespace-nowrap ${
+              isGitHubConnected
+                ? gitHubSyncStatus === 'error'
+                  ? 'bg-rose-500/15 border-rose-500/30 text-rose-300'
+                  : gitHubSyncStatus === 'saving'
+                  ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+                  : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'
+            }`}
+          >
+            <Github className="w-3.5 h-3.5" />
+            <span className="hidden xl:inline">
+              {isGitHubConnected
+                ? gitHubSyncStatus === 'saving'
+                  ? 'Syncing...'
+                  : gitHubSyncStatus === 'error'
+                  ? 'GitHub Error'
+                  : 'GitHub Synced'
+                : 'GitHub'}
+            </span>
+            {isGitHubConnected && (
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  gitHubSyncStatus === 'saving'
+                    ? 'bg-amber-400 animate-pulse'
+                    : gitHubSyncStatus === 'error'
+                    ? 'bg-rose-400'
+                    : 'bg-emerald-400'
+                }`}
+              />
+            )}
+          </button>
+
           {/* Backup / Cloudflare button */}
           <button
-            onClick={onOpenDataModal}
+            onClick={() => onOpenDataModal('backup')}
             title="Backup, Export & Cloudflare Hosting"
             className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 text-xs transition"
           >

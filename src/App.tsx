@@ -1,6 +1,12 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { BudgetState, ExpenseItem, IncomeItem, BudgetMonth, ExpenseStatus, BankAccount, PaycheckCycle } from './types/expense';
 import { loadBudgetState, saveBudgetState } from './utils/storage';
+import { 
+  GitHubConfig, 
+  loadGitHubConfig, 
+  saveGitHubConfig, 
+  saveDataToGitHub 
+} from './utils/githubSync';
 import { Header, ActiveTab } from './components/Header';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { OfflineIndicator } from './components/OfflineIndicator';
@@ -30,6 +36,11 @@ export default function App() {
   const [budgetState, setBudgetState] = useState<BudgetState>(() => loadBudgetState());
   const [activeTab, setActiveTab] = useState<ActiveTab>('ledger');
   
+  // GitHub Auto-Save & Sync State
+  const [gitHubConfig, setGitHubConfig] = useState<GitHubConfig>(() => loadGitHubConfig());
+  const [gitHubSyncStatus, setGitHubSyncStatus] = useState<'idle' | 'saving' | 'synced' | 'error'>('idle');
+  const [dataModalTab, setDataModalTab] = useState<'github' | 'backup' | 'cloudflare'>('github');
+
   // Modals state
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<ExpenseItem | null>(null);
@@ -41,11 +52,41 @@ export default function App() {
   // Custom confirmation dialog state
   const [deleteConfirmState, setDeleteConfirmState] = useState<DeleteConfirmState | null>(null);
 
-  // Sync to storage on change
+  // Sync to local storage on change
   const handleUpdateState = (newState: BudgetState) => {
     setBudgetState(newState);
     saveBudgetState(newState);
   };
+
+  // Continuous Auto-Save to GitHub on every data update
+  const isInitialMount = useRef(true);
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    if (!gitHubConfig.enabled || !gitHubConfig.token || !gitHubConfig.repo || !gitHubConfig.autoSave) {
+      return;
+    }
+
+    setGitHubSyncStatus('saving');
+    const timer = setTimeout(async () => {
+      const res = await saveDataToGitHub(gitHubConfig, budgetState);
+      if (res.success) {
+        setGitHubSyncStatus('synced');
+        setGitHubConfig((prev) => ({
+          ...prev,
+          lastSyncedAt: res.syncedAt,
+          lastCommitSha: res.commitSha,
+        }));
+      } else {
+        setGitHubSyncStatus('error');
+      }
+    }, 1800);
+
+    return () => clearTimeout(timer);
+  }, [budgetState, gitHubConfig]);
 
   const currentMonth: BudgetMonth = useMemo(() => {
     const month = budgetState.months[budgetState.currentMonthId] || Object.values(budgetState.months)[0];
@@ -353,13 +394,19 @@ export default function App() {
           setIsAddExpenseOpen(true);
         }}
         onOpenIncomeModal={() => setIsIncomeModalOpen(true)}
-        onOpenDataModal={() => setIsDataModalOpen(true)}
+        onOpenDataModal={(tab = 'github') => {
+          setDataModalTab(tab);
+          setIsDataModalOpen(true);
+        }}
         onOpenPaycheckCyclesModal={() => setIsPaycheckCyclesOpen(true)}
         onOpenManageAccountsModal={() => setIsManageAccountsOpen(true)}
         currentMonthLabel={currentMonth.label}
         availableMonths={availableMonths}
         currentMonthId={budgetState.currentMonthId}
         onSelectMonth={handleSelectMonth}
+        gitHubSyncStatus={gitHubSyncStatus}
+        isGitHubConnected={Boolean(gitHubConfig.enabled && gitHubConfig.token && gitHubConfig.repo)}
+        lastSyncedCommit={gitHubConfig.lastCommitSha}
       />
 
       {/* Main Container */}
@@ -511,13 +558,22 @@ export default function App() {
         onSaveCycles={handleSavePaycheckCycles}
       />
 
-      {/* Data Management, Export/Import & Cloudflare Hosting Modal */}
+      {/* Data Management, Export/Import, GitHub Auto-Sync & Cloudflare Modal */}
       <DataExportImportModal
         isOpen={isDataModalOpen}
         onClose={() => setIsDataModalOpen(false)}
         state={budgetState}
         onUpdateState={handleUpdateState}
         currentMonth={currentMonth}
+        gitHubConfig={gitHubConfig}
+        onUpdateGitHubConfig={(newCfg) => {
+          setGitHubConfig(newCfg);
+          saveGitHubConfig(newCfg);
+        }}
+        initialTab={dataModalTab}
+        onSyncSuccess={() => {
+          setGitHubSyncStatus('synced');
+        }}
       />
 
       {/* Safe In-App Confirmation Modal (Replaces browser window.confirm) */}

@@ -1,7 +1,30 @@
 import React, { useState } from 'react';
 import { BudgetState, BudgetMonth } from '../types/expense';
 import { exportToJSON, importFromJSON, exportToCSV, resetToDefault } from '../utils/storage';
-import { X, Download, Upload, RefreshCw, Globe, Check, FileSpreadsheet, FileCode } from 'lucide-react';
+import { 
+  GitHubConfig, 
+  validateGitHubToken, 
+  saveDataToGitHub, 
+  loadDataFromGitHub 
+} from '../utils/githubSync';
+import { 
+  X, 
+  Download, 
+  Upload, 
+  RefreshCw, 
+  Globe, 
+  Check, 
+  FileSpreadsheet, 
+  FileCode,
+  Github,
+  Cloud,
+  CheckCircle2,
+  AlertCircle,
+  ExternalLink,
+  ShieldCheck,
+  Eye,
+  EyeOff
+} from 'lucide-react';
 
 interface DataExportImportModalProps {
   isOpen: boolean;
@@ -9,6 +32,10 @@ interface DataExportImportModalProps {
   state: BudgetState;
   onUpdateState: (newState: BudgetState) => void;
   currentMonth: BudgetMonth;
+  gitHubConfig: GitHubConfig;
+  onUpdateGitHubConfig: (config: GitHubConfig) => void;
+  initialTab?: 'github' | 'backup' | 'cloudflare';
+  onSyncSuccess?: () => void;
 }
 
 export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
@@ -17,13 +44,136 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
   state,
   onUpdateState,
   currentMonth,
+  gitHubConfig,
+  onUpdateGitHubConfig,
+  initialTab = 'github',
+  onSyncSuccess,
 }) => {
-  const [activeTab, setActiveTab] = useState<'backup' | 'cloudflare'>('backup');
+  const [activeTab, setActiveTab] = useState<'github' | 'backup' | 'cloudflare'>(initialTab);
   const [copiedJSON, setCopiedJSON] = useState(false);
   const [importText, setImportText] = useState('');
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
+  // GitHub local form state
+  const [ghToken, setGhToken] = useState(gitHubConfig.token);
+  const [ghOwner, setGhOwner] = useState(gitHubConfig.owner);
+  const [ghRepo, setGhRepo] = useState(gitHubConfig.repo || 'pwa-budgv2');
+  const [ghBranch, setGhBranch] = useState(gitHubConfig.branch || 'main');
+  const [ghFilePath, setGhFilePath] = useState(gitHubConfig.filePath || 'data/flowledger-data.json');
+  const [ghAutoSave, setGhAutoSave] = useState(gitHubConfig.autoSave ?? true);
+  const [ghSkipCi, setGhSkipCi] = useState(gitHubConfig.skipCi ?? true);
+  const [showToken, setShowToken] = useState(false);
+
+  // Verification & sync UI state
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifiedUser, setVerifiedUser] = useState<string | null>(null);
+  const [verifiedAvatar, setVerifiedAvatar] = useState<string | null>(null);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+
+  const [isSavingToGitHub, setIsSavingToGitHub] = useState(false);
+  const [saveGHSuccess, setSaveGHSuccess] = useState<string | null>(null);
+  const [saveGHError, setSaveGHError] = useState<string | null>(null);
+
+  const [isLoadingFromGitHub, setIsLoadingFromGitHub] = useState(false);
+  const [loadGHSuccess, setLoadGHSuccess] = useState<string | null>(null);
+  const [loadGHError, setLoadGHError] = useState<string | null>(null);
+
   if (!isOpen) return null;
+
+  const handleTestGitHubConnection = async () => {
+    if (!ghToken.trim()) {
+      setVerifyError('Please enter a GitHub Personal Access Token.');
+      return;
+    }
+    setIsVerifying(true);
+    setVerifyError(null);
+    setVerifiedUser(null);
+    const res = await validateGitHubToken(ghToken);
+    setIsVerifying(false);
+    if (res.valid && res.username) {
+      setVerifiedUser(res.username);
+      setVerifiedAvatar(res.avatarUrl || null);
+      if (!ghOwner) {
+        setGhOwner(res.username);
+      }
+      // Auto-save configuration with updated owner
+      const updated: GitHubConfig = {
+        ...gitHubConfig,
+        enabled: true,
+        token: ghToken.trim(),
+        owner: ghOwner || res.username,
+        repo: ghRepo.trim(),
+        branch: ghBranch.trim() || 'main',
+        filePath: ghFilePath.trim() || 'data/flowledger-data.json',
+        autoSave: ghAutoSave,
+        skipCi: ghSkipCi,
+      };
+      onUpdateGitHubConfig(updated);
+    } else {
+      setVerifyError(res.error || 'Invalid token');
+    }
+  };
+
+  const handleSaveConfig = () => {
+    const updated: GitHubConfig = {
+      ...gitHubConfig,
+      enabled: Boolean(ghToken.trim() && (ghOwner.trim() || verifiedUser) && ghRepo.trim()),
+      token: ghToken.trim(),
+      owner: (ghOwner.trim() || verifiedUser || '').trim(),
+      repo: ghRepo.trim(),
+      branch: ghBranch.trim() || 'main',
+      filePath: ghFilePath.trim() || 'data/flowledger-data.json',
+      autoSave: ghAutoSave,
+      skipCi: ghSkipCi,
+    };
+    onUpdateGitHubConfig(updated);
+    return updated;
+  };
+
+  const handleSaveToGitHubNow = async () => {
+    const currentConfig = handleSaveConfig();
+    if (!currentConfig.token || !currentConfig.repo) {
+      setSaveGHError('Please enter your GitHub token and repository name.');
+      return;
+    }
+    setIsSavingToGitHub(true);
+    setSaveGHError(null);
+    setSaveGHSuccess(null);
+
+    const res = await saveDataToGitHub(currentConfig, state, `Manual FlowLedger save via UI${currentConfig.skipCi ? ' [skip ci]' : ''}`);
+    setIsSavingToGitHub(false);
+
+    if (res.success) {
+      setSaveGHSuccess(`Saved to GitHub! Commit: ${res.commitSha || 'latest'}`);
+      if (onSyncSuccess) onSyncSuccess();
+      setTimeout(() => setSaveGHSuccess(null), 4000);
+    } else {
+      setSaveGHError(res.error || 'Failed to save to GitHub');
+    }
+  };
+
+  const handleLoadFromGitHubNow = async () => {
+    const currentConfig = handleSaveConfig();
+    if (!currentConfig.token || !currentConfig.repo) {
+      setLoadGHError('Please enter your GitHub token and repository name.');
+      return;
+    }
+    setIsLoadingFromGitHub(true);
+    setLoadGHError(null);
+    setLoadGHSuccess(null);
+
+    const res = await loadDataFromGitHub(currentConfig);
+    setIsLoadingFromGitHub(false);
+
+    if (res.success && res.state) {
+      onUpdateState(res.state);
+      setLoadGHSuccess(`Successfully loaded latest data from GitHub (commit: ${res.commitSha || 'latest'})!`);
+      if (onSyncSuccess) onSyncSuccess();
+      setTimeout(() => setLoadGHSuccess(null), 4000);
+    } else {
+      setLoadGHError(res.error || 'Failed to load from GitHub');
+    }
+  };
 
   const handleDownloadJSON = () => {
     const json = exportToJSON(state);
@@ -113,8 +263,9 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
       <div className="w-full max-w-xl rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl p-6 text-slate-100 max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between pb-3 border-b border-slate-800">
           <div className="flex items-center gap-2">
+            <Github className="w-5 h-5 text-emerald-400" />
             <h2 className="text-base font-bold text-white tracking-tight">
-              Data Management & Cloudflare Hosting
+              Data Sync, GitHub & Cloudflare
             </h2>
           </div>
           <button
@@ -126,17 +277,31 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
         </div>
 
         {/* Tab switch */}
-        <div className="flex items-center gap-2 mt-4 p-1 bg-slate-950/60 rounded-xl border border-slate-800 text-xs">
+        <div className="flex items-center gap-1.5 mt-4 p-1 bg-slate-950/60 rounded-xl border border-slate-800 text-xs">
+          <button
+            onClick={() => setActiveTab('github')}
+            className={`flex-1 py-1.5 rounded-lg font-semibold transition flex items-center justify-center gap-1.5 ${
+              activeTab === 'github'
+                ? 'bg-slate-800 text-white shadow'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Github className="w-3.5 h-3.5 text-emerald-400" />
+            <span>GitHub Auto-Save</span>
+          </button>
+
           <button
             onClick={() => setActiveTab('backup')}
-            className={`flex-1 py-1.5 rounded-lg font-semibold transition ${
+            className={`flex-1 py-1.5 rounded-lg font-semibold transition flex items-center justify-center gap-1.5 ${
               activeTab === 'backup'
                 ? 'bg-slate-800 text-white shadow'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            Backup & Export
+            <FileCode className="w-3.5 h-3.5 text-blue-400" />
+            <span>File Backup</span>
           </button>
+
           <button
             onClick={() => setActiveTab('cloudflare')}
             className={`flex-1 py-1.5 rounded-lg font-semibold transition flex items-center justify-center gap-1.5 ${
@@ -146,11 +311,260 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
             }`}
           >
             <Globe className="w-3.5 h-3.5 text-orange-400" />
-            <span>Cloudflare Hosting Guide</span>
+            <span>Cloudflare</span>
           </button>
         </div>
 
-        {activeTab === 'backup' ? (
+        {/* TAB 1: GITHUB AUTO-SAVE */}
+        {activeTab === 'github' && (
+          <div className="mt-4 space-y-4 text-xs">
+            {/* Banner */}
+            <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/30 flex items-start gap-2.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-emerald-300">
+                  Continuous GitHub Synchronization
+                </p>
+                <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                  Every time you enter a transaction, adjust balances, or change pay periods, FlowLedger will automatically commit your updated ledger data directly to your GitHub repository!
+                </p>
+              </div>
+            </div>
+
+            {/* GitHub Personal Access Token Form */}
+            <div className="p-3.5 rounded-xl bg-slate-950/40 border border-slate-800 space-y-3">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-semibold text-slate-200 flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>GitHub Personal Access Token (PAT) *</span>
+                  </label>
+                  <a
+                    href="https://github.com/settings/tokens/new?scopes=repo&description=FlowLedger+Budget+AutoSync"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 underline font-medium"
+                  >
+                    <span>Create token (30s)</span>
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </a>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showToken ? 'text' : 'password'}
+                    placeholder="ghp_xxxx or github_pat_xxxx"
+                    value={ghToken}
+                    onChange={(e) => {
+                      setGhToken(e.target.value);
+                      setVerifiedUser(null);
+                    }}
+                    className="w-full pl-3 pr-20 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-emerald-500"
+                  />
+                  <div className="absolute right-1 top-1 bottom-1 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowToken(!showToken)}
+                      className="p-1 text-slate-400 hover:text-slate-200"
+                      title={showToken ? 'Hide token' : 'Show token'}
+                    >
+                      {showToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleTestGitHubConnection}
+                      disabled={isVerifying || !ghToken.trim()}
+                      className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-emerald-400 font-semibold text-[10px] disabled:opacity-40 transition"
+                    >
+                      {isVerifying ? 'Checking...' : 'Verify'}
+                    </button>
+                  </div>
+                </div>
+                {verifiedUser && (
+                  <p className="text-[11px] text-emerald-400 mt-1 flex items-center gap-1.5">
+                    {verifiedAvatar && (
+                      <img src={verifiedAvatar} alt="" className="w-3.5 h-3.5 rounded-full" />
+                    )}
+                    <span>Connected as <strong>@{verifiedUser}</strong></span>
+                  </p>
+                )}
+                {verifyError && (
+                  <p className="text-[11px] text-rose-400 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    <span>{verifyError}</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Repo & Path Configuration */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="block font-medium text-slate-300 mb-1">
+                    GitHub Username / Owner
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 86brancan"
+                    value={ghOwner}
+                    onChange={(e) => setGhOwner(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-medium text-slate-300 mb-1">
+                    Repository Name *
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="pwa-budgv2"
+                    value={ghRepo}
+                    onChange={(e) => setGhRepo(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-slate-300 mb-1">
+                    Branch Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="main"
+                    value={ghBranch}
+                    onChange={(e) => setGhBranch(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-medium text-slate-300 mb-1">
+                    File Path in Repository
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="data/flowledger-data.json"
+                    value={ghFilePath}
+                    onChange={(e) => setGhFilePath(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {/* Toggles */}
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={ghAutoSave}
+                    onChange={(e) => {
+                      setGhAutoSave(e.target.checked);
+                      handleSaveConfig();
+                    }}
+                    className="w-4 h-4 rounded text-emerald-500 bg-slate-900 border-slate-700 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                  />
+                  <div>
+                    <span className="font-semibold text-slate-200">
+                      Auto-Save to GitHub on every update
+                    </span>
+                    <p className="text-[10px] text-slate-400">
+                      Whenever you add/edit expenses, accounts, or incomes, changes commit automatically.
+                    </p>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={ghSkipCi}
+                    onChange={(e) => {
+                      setGhSkipCi(e.target.checked);
+                      handleSaveConfig();
+                    }}
+                    className="w-4 h-4 rounded text-emerald-500 bg-slate-900 border-slate-700 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                  />
+                  <div>
+                    <span className="font-semibold text-slate-200">
+                      Include [skip ci] in commit messages (Recommended)
+                    </span>
+                    <p className="text-[10px] text-slate-400">
+                      Prevents Cloudflare from re-building the web app on every small transaction save.
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Status & Last Synced */}
+              {gitHubConfig.lastSyncedAt && (
+                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+                  <span>Last synced: <strong>{new Date(gitHubConfig.lastSyncedAt).toLocaleString()}</strong></span>
+                  {gitHubConfig.lastCommitSha && (
+                    <span className="font-mono text-emerald-400 px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800">
+                      commit {gitHubConfig.lastCommitSha}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Feedback messages */}
+            {saveGHSuccess && (
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{saveGHSuccess}</span>
+              </div>
+            )}
+            {saveGHError && (
+              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{saveGHError}</span>
+              </div>
+            )}
+            {loadGHSuccess && (
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{loadGHSuccess}</span>
+              </div>
+            )}
+            {loadGHError && (
+              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{loadGHError}</span>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-2">
+              <button
+                type="button"
+                onClick={handleLoadFromGitHubNow}
+                disabled={isLoadingFromGitHub || !ghToken.trim()}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold transition border border-slate-700 disabled:opacity-40"
+              >
+                <Download className="w-3.5 h-3.5 text-blue-400" />
+                <span>{isLoadingFromGitHub ? 'Downloading...' : 'Load from GitHub'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveToGitHubNow}
+                disabled={isSavingToGitHub || !ghToken.trim()}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold transition shadow-sm active:scale-95 disabled:opacity-40"
+              >
+                {isSavingToGitHub ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Upload className="w-3.5 h-3.5" />
+                )}
+                <span>{isSavingToGitHub ? 'Committing...' : 'Commit & Save to GitHub'}</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: MANUAL BACKUP & RESTORE */}
+        {activeTab === 'backup' && (
           <div className="mt-4 space-y-4 text-xs">
             {/* Download buttons */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -248,92 +662,84 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
             {/* Reset to template */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-3 border-t border-slate-800">
               {showResetConfirm ? (
-                <div className="flex items-center gap-2 p-1.5 rounded-lg bg-rose-500/10 border border-rose-500/40 text-xs">
-                  <span className="text-rose-300 font-semibold text-[11px]">Confirm reset?</span>
-                  <button
-                    type="button"
-                    onClick={handleReset}
-                    className="px-2 py-0.5 rounded bg-rose-500 text-white font-bold text-[11px] hover:bg-rose-600"
-                  >
-                    Yes, Reset
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowResetConfirm(false)}
-                    className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[11px] hover:bg-slate-700"
-                  >
-                    Cancel
-                  </button>
+                <div className="flex items-center gap-2 w-full justify-between">
+                  <span className="text-rose-400 font-semibold text-[11px]">
+                    Clear all entries and start fresh?
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowResetConfirm(false)}
+                      className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 text-[11px]"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleReset}
+                      className="px-2.5 py-1 rounded-lg bg-rose-500 text-white font-bold text-[11px]"
+                    >
+                      Confirm Reset
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => setShowResetConfirm(true)}
-                  className="flex items-center gap-1.5 text-rose-400 hover:text-rose-300 text-xs transition"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Reset to Original Spreadsheet Template</span>
-                </button>
+                <>
+                  <span className="text-slate-500 text-[11px]">
+                    Want a fresh ledger?
+                  </span>
+                  <button
+                    onClick={() => setShowResetConfirm(true)}
+                    className="text-slate-400 hover:text-rose-400 transition text-[11px] underline"
+                  >
+                    Reset all data to empty template
+                  </button>
+                </>
               )}
-
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 transition font-medium text-xs"
-              >
-                Close
-              </button>
             </div>
           </div>
-        ) : (
-          /* Cloudflare Hosting Guide Tab */
-          <div className="mt-4 space-y-3.5 text-xs text-slate-300 leading-relaxed">
-            <div className="p-3 rounded-xl bg-orange-950/20 border border-orange-500/30">
-              <h4 className="font-bold text-orange-300 mb-1 flex items-center gap-1.5">
-                <Globe className="w-4 h-4" />
-                <span>Ready for Cloudflare Pages</span>
-              </h4>
-              <p className="text-[11px] text-slate-300">
-                This PWA is an offline-capable single-page application built with Vite. It compiles to static assets in <code className="bg-slate-800 px-1 py-0.5 rounded text-orange-200 font-mono">dist/</code> with native SPA routing and full offline service worker caching.
+        )}
+
+        {/* TAB 3: CLOUDFLARE HOSTING GUIDE */}
+        {activeTab === 'cloudflare' && (
+          <div className="mt-4 space-y-3.5 text-xs">
+            <div className="p-3.5 rounded-xl bg-orange-950/20 border border-orange-500/30">
+              <span className="font-bold text-orange-400 block mb-1 text-sm">
+                Deploying to Cloudflare Workers / Pages
+              </span>
+              <p className="text-slate-300 text-[11px] leading-relaxed">
+                FlowLedger is built with static assets configured for Cloudflare Workers & Pages.
               </p>
             </div>
 
             <div className="space-y-2">
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-                <strong className="block text-white font-semibold mb-0.5">
-                  Method 1: Connect via Git (Recommended)
-                </strong>
-                <ol className="list-decimal list-inside space-y-1 text-slate-400">
-                  <li>Push your repository to GitHub or GitLab.</li>
-                  <li>In Cloudflare Dashboard, go to <strong>Workers & Pages</strong> &gt; <strong>Create application</strong> &gt; <strong>Pages</strong>.</li>
-                  <li>Select <strong>Connect to Git</strong> and select your repo.</li>
-                  <li>Set <strong>Framework preset</strong> to <strong className="text-slate-200">Vite</strong>.</li>
-                  <li>Build command: <code className="text-emerald-300 font-mono">npm run build</code></li>
-                  <li>Build output directory: <code className="text-emerald-300 font-mono">dist</code></li>
-                  <li>Click <strong>Save and Deploy</strong>. Cloudflare will automatically build and serve with SSL and Edge caching!</li>
-                </ol>
-              </div>
-
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-                <strong className="block text-white font-semibold mb-0.5">
-                  Method 2: Direct Upload (or Wrangler CLI)
-                </strong>
-                <p className="text-slate-400 mb-1.5">
-                  Run locally or in CI:
+              <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800">
+                <span className="font-semibold text-slate-200 block mb-1">
+                  1. Deploy Command
+                </span>
+                <p className="text-slate-400 text-[11px] mb-2">
+                  In your repository or terminal, deploy with:
                 </p>
-                <div className="p-2 rounded bg-slate-950 font-mono text-[11px] text-emerald-400 border border-slate-800 select-all">
-                  npx wrangler pages deploy dist --project-name=flowledger-pwa
-                </div>
+                <code className="block p-2 rounded-lg bg-slate-900 border border-slate-800 text-emerald-400 font-mono text-[11px]">
+                  npx wrangler deploy
+                </code>
               </div>
-            </div>
 
-            <div className="flex items-center justify-end pt-2 border-t border-slate-800">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 transition font-medium"
-              >
-                Close
-              </button>
+              <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800">
+                <span className="font-semibold text-slate-200 block mb-1">
+                  2. Single Page App Configuration
+                </span>
+                <p className="text-slate-400 text-[11px]">
+                  Our <code className="text-slate-200">wrangler.jsonc</code> is pre-configured with <code className="text-emerald-400 font-mono">not_found_handling: "single-page-application"</code> to route all URLs directly to <code className="text-slate-200">index.html</code>.
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800">
+                <span className="font-semibold text-slate-200 block mb-1">
+                  3. If Cloudflare says "No URLs enabled"
+                </span>
+                <p className="text-slate-400 text-[11px] leading-relaxed">
+                  Go to your <strong>Cloudflare Dashboard → Workers & Pages → pwa-budgv2 → Settings → Domains & Routes</strong> and enable the <code className="text-emerald-400 font-mono">workers.dev</code> route or attach your custom domain.
+                </p>
+              </div>
             </div>
           </div>
         )}

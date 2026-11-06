@@ -10,6 +10,20 @@
 .pt-safe {
   padding-top: max(env(safe-area-inset-top, 0px), 0px);
 }
+.pt-safe-top {
+  padding-top: max(env(safe-area-inset-top, 0px), 14px);
+}
+@media (display-mode: standalone) {
+  .pt-safe-top {
+    padding-top: max(env(safe-area-inset-top, 0px), 52px);
+  }
+}
+@supports (-webkit-touch-callout: none) {
+  /* iOS Safari & Standalone PWA status bar safe clearance */
+  .pt-safe-top {
+    padding-top: max(env(safe-area-inset-top, 0px), 52px);
+  }
+}
 .pb-safe {
   padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
 }
@@ -18,6 +32,11 @@
 }
 .pl-safe {
   padding-left: max(env(safe-area-inset-left, 0px), 0px);
+}
+
+button, a, select, input {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* Edge overlay safe padding for iPhone Duo / foldables with side floating status widget */

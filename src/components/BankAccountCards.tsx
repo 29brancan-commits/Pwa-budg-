@@ -26,6 +26,7 @@ interface BankAccountCardsProps {
   onDeleteAccount: (accountId: string) => void;
   selectedAccountFilter: string;
   onSelectAccountFilter: (accountId: string) => void;
+  forceExpanded?: boolean;
 }
 
 export const BankAccountCards: React.FC<BankAccountCardsProps> = ({
@@ -39,11 +40,18 @@ export const BankAccountCards: React.FC<BankAccountCardsProps> = ({
   onDeleteAccount,
   selectedAccountFilter,
   onSelectAccountFilter,
+  forceExpanded = false,
 }) => {
-  // Collapse by default as requested
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
+  // Collapse by default unless forceExpanded (e.g. Duo Dual-Screen opened mode)
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(!forceExpanded);
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
   const [editBalanceValue, setEditBalanceValue] = useState<string>('');
+
+  React.useEffect(() => {
+    if (forceExpanded) {
+      setIsCollapsed(false);
+    }
+  }, [forceExpanded]);
 
   const handleStartEdit = (account: BankAccount) => {
     setEditingAccountId(account.id);
@@ -263,7 +271,7 @@ export const BankAccountCards: React.FC<BankAccountCardsProps> = ({
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0 pr-8 sm:pr-0">
+                    <div className="flex items-center gap-1.5 shrink-0 pr-12 sm:pr-2">
                       {accounts.length > 1 && (
                         <button
                           type="button"

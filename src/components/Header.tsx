@@ -53,20 +53,20 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleDualPaneMode,
 }) => {
   return (
-    <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-4 lg:px-8 py-3 pt-safe">
-      <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 md:gap-8">
+    <header className="sticky top-0 z-50 bg-slate-950/95 backdrop-blur-md border-b border-slate-800/80 px-3 sm:px-6 lg:px-8 pt-safe-top pb-2.5 select-none">
+      <div className="w-full max-w-[1920px] mx-auto flex items-center justify-between gap-2.5 sm:gap-4 md:gap-6">
         {/* Zone 1: Brand Wordmark */}
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2.5 shrink-0">
           <a
             href="/"
-            className="text-lg font-bold tracking-tight text-white flex items-center gap-2 whitespace-nowrap shrink-0 hover:text-emerald-400 transition"
+            className="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2 whitespace-nowrap shrink-0 hover:text-emerald-400 transition cursor-pointer touch-manipulation"
           >
             <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
               </svg>
             </div>
-            <span>FlowLedger</span>
+            <span className="hidden xs:inline">FlowLedger</span>
           </a>
 
           {/* Small Version Badge for build verification */}
@@ -81,7 +81,7 @@ export const Header: React.FC<HeaderProps> = ({
           <select
             value={currentMonthId}
             onChange={(e) => onSelectMonth(e.target.value)}
-            className="hidden sm:inline-block px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 focus:outline-none focus:border-emerald-500 shrink-0 cursor-pointer"
+            className="px-2 py-1 rounded-lg bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 focus:outline-none focus:border-emerald-500 shrink-0 cursor-pointer touch-manipulation"
           >
             {availableMonths.map((m) => (
               <option key={m.id} value={m.id}>
@@ -92,10 +92,10 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Zone 2: Navigation Links (Single-line, text links with clean active states) */}
-        <nav className="hidden md:flex items-center gap-5 text-xs font-medium text-slate-400">
+        <nav className="hidden lg:flex items-center gap-4 xl:gap-5 text-xs font-medium text-slate-400">
           <button
             onClick={() => onSelectTab('ledger')}
-            className={`flex items-center gap-1.5 transition whitespace-nowrap shrink-0 pb-0.5 border-b-2 ${
+            className={`flex items-center gap-1.5 transition whitespace-nowrap shrink-0 pb-0.5 border-b-2 cursor-pointer touch-manipulation active:scale-95 ${
               activeTab === 'ledger'
                 ? 'text-white border-emerald-500 font-semibold'
                 : 'border-transparent hover:text-slate-200'
@@ -107,7 +107,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={() => onSelectTab('charts')}
-            className={`flex items-center gap-1.5 transition whitespace-nowrap shrink-0 pb-0.5 border-b-2 ${
+            className={`flex items-center gap-1.5 transition whitespace-nowrap shrink-0 pb-0.5 border-b-2 cursor-pointer touch-manipulation active:scale-95 ${
               activeTab === 'charts'
                 ? 'text-white border-emerald-500 font-semibold'
                 : 'border-transparent hover:text-slate-200'
@@ -119,7 +119,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={() => onSelectTab('calendar')}
-            className={`flex items-center gap-1.5 transition whitespace-nowrap shrink-0 pb-0.5 border-b-2 ${
+            className={`flex items-center gap-1.5 transition whitespace-nowrap shrink-0 pb-0.5 border-b-2 cursor-pointer touch-manipulation active:scale-95 ${
               activeTab === 'calendar'
                 ? 'text-white border-emerald-500 font-semibold'
                 : 'border-transparent hover:text-slate-200'
@@ -131,7 +131,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={() => onSelectTab('debt')}
-            className={`flex items-center gap-1.5 transition whitespace-nowrap shrink-0 pb-0.5 border-b-2 ${
+            className={`flex items-center gap-1.5 transition whitespace-nowrap shrink-0 pb-0.5 border-b-2 cursor-pointer touch-manipulation active:scale-95 ${
               activeTab === 'debt'
                 ? 'text-white border-emerald-500 font-semibold'
                 : 'border-transparent hover:text-slate-200'
@@ -142,7 +142,7 @@ export const Header: React.FC<HeaderProps> = ({
         </nav>
 
         {/* Zone 3: Primary Action & Utilities (with safe right margin for iPhone Duo status overlay) */}
-        <div className="flex items-center gap-2 shrink-0 pr-14 sm:pr-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 pr-16 sm:pr-20 lg:pr-24">
           {/* Duo Dual-Screen Mode Toggle */}
           {onToggleDualPaneMode && (
             <button
@@ -152,36 +152,26 @@ export const Header: React.FC<HeaderProps> = ({
                   ? 'Dual-Screen Mode Active (Opened Duo) - Click to switch to Single-Screen (Closed Duo)'
                   : 'Switch to Dual-Screen 2-Pane View (for Opened Duo / Wide screen)'
               }
-              className={`hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition whitespace-nowrap active:scale-95 ${
+              className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition whitespace-nowrap active:scale-95 cursor-pointer touch-manipulation ${
                 isDualPaneMode
                   ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300 shadow-sm'
                   : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
               }`}
             >
               <Columns2 className="w-3.5 h-3.5" />
-              <span>{isDualPaneMode ? 'Duo: Opened' : 'Duo: Closed'}</span>
+              <span className="hidden sm:inline">{isDualPaneMode ? 'Duo: Opened' : 'Duo: Closed'}</span>
             </button>
           )}
-
-          {/* Incomes button */}
-          <button
-            onClick={onOpenIncomeModal}
-            title="Manage Incomes / Paychecks"
-            className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-medium transition"
-          >
-            <Wallet className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Paychecks</span>
-          </button>
 
           {/* Pay Periods / Bi-Weekly Cycles button */}
           {onOpenPaycheckCyclesModal && (
             <button
               onClick={onOpenPaycheckCyclesModal}
               title="Configure Paycheck Periods & Bi-Weekly Dates"
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 text-xs font-semibold transition whitespace-nowrap active:scale-95"
+              className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 text-xs font-semibold transition whitespace-nowrap active:scale-95 cursor-pointer touch-manipulation"
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span>Pay Periods</span>
+              <span className="hidden xs:inline">Pay Periods</span>
             </button>
           )}
 
@@ -190,12 +180,22 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               onClick={onOpenManageAccountsModal}
               title="Add or Delete Bank Accounts"
-              className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-medium transition whitespace-nowrap"
+              className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-medium transition whitespace-nowrap cursor-pointer touch-manipulation active:scale-95"
             >
               <Building2 className="w-3.5 h-3.5 text-purple-400" />
               <span>Banks</span>
             </button>
           )}
+
+          {/* Incomes button */}
+          <button
+            onClick={onOpenIncomeModal}
+            title="Manage Incomes / Paychecks"
+            className="hidden md:flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-medium transition cursor-pointer touch-manipulation active:scale-95"
+          >
+            <Wallet className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Paychecks</span>
+          </button>
 
           {/* GitHub Auto-Sync Button & Indicator */}
           <button
@@ -209,7 +209,7 @@ export const Header: React.FC<HeaderProps> = ({
                   : `GitHub Auto-Save Active ${lastSyncedCommit ? '(commit ' + lastSyncedCommit + ')' : '(synced)'}`
                 : 'Connect GitHub to auto-save data on every update'
             }
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition whitespace-nowrap cursor-pointer touch-manipulation active:scale-95 ${
               isGitHubConnected
                 ? gitHubSyncStatus === 'error'
                   ? 'bg-rose-500/15 border-rose-500/30 text-rose-300'
@@ -246,7 +246,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={() => onOpenDataModal('backup')}
             title="Backup, Export & Cloudflare Hosting"
-            className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 text-xs transition"
+            className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 text-xs transition cursor-pointer touch-manipulation active:scale-95"
           >
             <Database className="w-3.5 h-3.5" />
           </button>
@@ -257,7 +257,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Primary CTA */}
           <button
             onClick={onOpenAddModal}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition shadow-md shadow-emerald-500/20 active:scale-95 whitespace-nowrap"
+            className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition shadow-md shadow-emerald-500/20 active:scale-95 whitespace-nowrap cursor-pointer touch-manipulation"
           >
             <Plus className="w-4 h-4" />
             <span className="hidden xs:inline">Add Bill</span>

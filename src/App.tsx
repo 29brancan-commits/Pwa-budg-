@@ -44,10 +44,39 @@ export default function App() {
   // Duo Dual-Screen Mode State (Opened = 2 panes side-by-side; Closed = single column stacked)
   const [isDualPaneMode, setIsDualPaneMode] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
-      return window.innerWidth >= 1024;
+      const isSpanned = window.matchMedia?.('(horizontal-viewport-segments: 2), (screen-spanning: single-fold-vertical)')?.matches;
+      return Boolean(isSpanned || window.innerWidth >= 850);
     }
     return false;
   });
+
+  const manualDualPaneOverride = useRef<boolean | null>(null);
+
+  useEffect(() => {
+    const handleViewportChange = () => {
+      // Auto-detect unfolded Duo or wide screen unless user explicitly set override
+      if (manualDualPaneOverride.current === null) {
+        const isSpanned = window.matchMedia?.('(horizontal-viewport-segments: 2), (screen-spanning: single-fold-vertical)')?.matches;
+        const shouldBeDual = Boolean(isSpanned || window.innerWidth >= 850);
+        setIsDualPaneMode(shouldBeDual);
+      }
+    };
+
+    window.addEventListener('resize', handleViewportChange);
+    window.addEventListener('orientationchange', handleViewportChange);
+    return () => {
+      window.removeEventListener('resize', handleViewportChange);
+      window.removeEventListener('orientationchange', handleViewportChange);
+    };
+  }, []);
+
+  const handleToggleDualPaneMode = () => {
+    setIsDualPaneMode((prev) => {
+      const next = !prev;
+      manualDualPaneOverride.current = next;
+      return next;
+    });
+  };
 
   // Modals state
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
@@ -416,16 +445,25 @@ export default function App() {
         isGitHubConnected={Boolean(gitHubConfig.enabled && gitHubConfig.token && gitHubConfig.repo)}
         lastSyncedCommit={gitHubConfig.lastCommitSha}
         isDualPaneMode={isDualPaneMode}
-        onToggleDualPaneMode={() => setIsDualPaneMode((prev) => !prev)}
+        onToggleDualPaneMode={handleToggleDualPaneMode}
       />
 
-      {/* Main Container with Duo edge overlay safe clearance on right */}
-      <main className="flex-1 max-w-7xl w-full mx-auto pl-3 sm:pl-4 lg:pl-8 pr-14 sm:pr-4 lg:pr-8 py-5 pb-24 md:pb-12">
+      {/* Main Container: Full width up to 1920px so unfolded Duo display is completely filled */}
+      <main className="flex-1 w-full max-w-[1920px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-5 pb-24 md:pb-12">
         {/* Duo Opened Dual-Screen Layout (Side-by-Side 2-Screen Panels) */}
         {isDualPaneMode ? (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-start">
-            {/* Screen 1 (Left Pane): Bank Accounts & Leftover Runway */}
-            <div className="lg:col-span-5 space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 xl:gap-12 items-start w-full">
+            {/* Screen 1 (Left Display): Bank Accounts & Leftover Runway Command Center */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/20">
+                    Screen 1 · Financial Hub
+                  </span>
+                  <span className="text-xs text-slate-400">Live Balances & Inflows</span>
+                </div>
+              </div>
+
               <section aria-label="Bank Accounts & Leftover Runway">
                 <BankAccountCards
                   accounts={currentMonth.accounts}
@@ -438,12 +476,88 @@ export default function App() {
                   onDeleteAccount={handleRequestDeleteAccount}
                   selectedAccountFilter={budgetState.selectedAccountFilter || 'all'}
                   onSelectAccountFilter={handleSelectAccountFilter}
+                  forceExpanded={true}
                 />
               </section>
+
+              {/* Paycheck Cycles Overview for Screen 1 */}
+              <div className="rounded-2xl bg-slate-900/40 border border-slate-800/80 p-3.5 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-white text-xs">Bi-Weekly Pay Cycles</span>
+                    <span className="text-[10px] text-slate-400 font-mono">({currentMonth.paycheckCycles.length})</span>
+                  </div>
+                  <button
+                    onClick={() => setIsPaycheckCyclesOpen(true)}
+                    className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold cursor-pointer active:scale-95 transition"
+                  >
+                    Edit Dates
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {currentMonth.paycheckCycles.map((cycle, idx) => {
+                    const cycleExpenses = currentMonth.expenses.filter((e) => e.payPeriod === cycle.id || e.payPeriod === 'both');
+                    const cycleTotal = cycleExpenses.reduce((sum, e) => sum + e.amount, 0);
+                    return (
+                      <div key={cycle.id || idx} className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/70">
+                        <span className="text-[11px] font-semibold text-slate-300 block truncate">{cycle.label}</span>
+                        <span className="text-[10px] text-slate-400 block mb-1">Days {cycle.startDay} – {cycle.endDay}</span>
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-xs font-mono font-bold text-white tabular-nums">
+                            {currency}{cycleTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                          <span className="text-[10px] text-slate-400">allocated</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
-            {/* Screen 2 (Right Pane): Active View (Ledger / Charts / Calendar / Debt) */}
-            <div className="lg:col-span-7 space-y-4">
+            {/* Screen 2 (Right Display): Active View (Ledger / Charts / Calendar / Debt) */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/20">
+                    Screen 2 · {activeTab === 'ledger' ? 'Obligations Ledger' : activeTab === 'charts' ? 'Cash Flow & Analytics' : activeTab === 'calendar' ? 'Due Schedule' : 'Debt Snowball'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 bg-slate-900/90 p-0.5 rounded-lg border border-slate-800">
+                  <button
+                    onClick={() => setActiveTab('ledger')}
+                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer active:scale-95 ${
+                      activeTab === 'ledger' ? 'bg-emerald-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Ledger
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('charts')}
+                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer active:scale-95 ${
+                      activeTab === 'charts' ? 'bg-emerald-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Charts
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('calendar')}
+                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer active:scale-95 ${
+                      activeTab === 'calendar' ? 'bg-emerald-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Calendar
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('debt')}
+                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer active:scale-95 ${
+                      activeTab === 'debt' ? 'bg-emerald-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Debt
+                  </button>
+                </div>
+              </div>
               {activeTab === 'ledger' && (
                 <section className="rounded-2xl bg-slate-900/40 border border-slate-800/80 p-4 lg:p-6 shadow-sm">
                   <ExpenseList
@@ -513,7 +627,7 @@ export default function App() {
           </div>
         ) : (
           /* Duo Closed / Single Screen Stacked Layout */
-          <>
+          <div className="max-w-4xl mx-auto space-y-4">
             <section aria-label="Bank Accounts & Leftover Runway">
               <BankAccountCards
                 accounts={currentMonth.accounts}
@@ -598,7 +712,7 @@ export default function App() {
                 />
               </div>
             )}
-          </>
+          </div>
         )}
       </main>
 
@@ -607,6 +721,7 @@ export default function App() {
         activeTab={activeTab}
         onSelectTab={setActiveTab}
         onOpenIncomeModal={() => setIsIncomeModalOpen(true)}
+        isHidden={isDualPaneMode}
       />
 
       {/* Offline Connectivity Status Pill */}

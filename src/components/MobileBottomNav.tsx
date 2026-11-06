@@ -6,15 +6,19 @@ interface MobileBottomNavProps {
   activeTab: ActiveTab;
   onSelectTab: (tab: ActiveTab) => void;
   onOpenIncomeModal: () => void;
+  isHidden?: boolean;
 }
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   activeTab,
   onSelectTab,
   onOpenIncomeModal,
+  isHidden = false,
 }) => {
+  if (isHidden) return null;
+
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-lg border-t border-slate-800/80 px-2 pb-safe">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur-lg border-t border-slate-800/80 px-2 pb-safe select-none">
       <div className="grid grid-cols-5 items-center h-16 max-w-md mx-auto">
         <button
           onClick={() => onSelectTab('ledger')}

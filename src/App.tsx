@@ -8,6 +8,13 @@ import {
   saveDataToGitHub,
   loadDataFromGitHub
 } from './utils/githubSync';
+import {
+  CloudflareConfig,
+  loadCloudflareConfig,
+  saveCloudflareConfig,
+  saveDataToCloudflare,
+  loadDataFromCloudflare
+} from './utils/cloudflareSync';
 import { Header, ActiveTab } from './components/Header';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { OfflineIndicator } from './components/OfflineIndicator';
@@ -40,6 +47,11 @@ export default function App() {
   // GitHub Auto-Save & Sync State
   const [gitHubConfig, setGitHubConfig] = useState<GitHubConfig>(() => loadGitHubConfig());
   const [gitHubSyncStatus, setGitHubSyncStatus] = useState<'idle' | 'saving' | 'synced' | 'error'>('idle');
+
+  // Cloudflare Auto-Save & Sync State
+  const [cloudflareConfig, setCloudflareConfig] = useState<CloudflareConfig>(() => loadCloudflareConfig());
+  const [cloudflareSyncStatus, setCloudflareSyncStatus] = useState<'idle' | 'saving' | 'synced' | 'error'>('idle');
+
   const [dataModalTab, setDataModalTab] = useState<'github' | 'backup' | 'cloudflare'>('github');
 
   // Duo Dual-Screen Mode State (Opened = 2 panes side-by-side; Closed = single column stacked)
@@ -70,7 +82,7 @@ export default function App() {
     };
   }, []);
 
-  // Asynchronous hydration from IndexedDB, localStorage storage events, and GitHub sync
+  // Asynchronous hydration from IndexedDB, localStorage storage events, GitHub sync, and Cloudflare sync
   useEffect(() => {
     // 1. Asynchronously check IndexedDB
     loadFromIndexedDB('budget_state').then((idbState) => {
@@ -95,6 +107,9 @@ export default function App() {
       }
       if (e.key === 'flowledger_github_config_v1') {
         setGitHubConfig(loadGitHubConfig());
+      }
+      if (e.key === 'flowledger_cloudflare_config_v1') {
+        setCloudflareConfig(loadCloudflareConfig());
       }
     };
 
@@ -121,6 +136,17 @@ export default function App() {
           setBudgetState(res.state);
           saveBudgetState(res.state);
           setGitHubSyncStatus('synced');
+        }
+      });
+    }
+
+    // 4. Auto-load latest state from Cloudflare if enabled
+    if (cloudflareConfig.enabled) {
+      loadDataFromCloudflare(cloudflareConfig).then((res) => {
+        if (res.success && res.state) {
+          setBudgetState(res.state);
+          saveBudgetState(res.state);
+          setCloudflareSyncStatus('synced');
         }
       });
     }
@@ -185,6 +211,35 @@ export default function App() {
 
     return () => clearTimeout(timer);
   }, [budgetState, gitHubConfig]);
+
+  // Continuous Auto-Save to Cloudflare on every data update
+  const isCfInitialMount = useRef(true);
+  useEffect(() => {
+    if (isCfInitialMount.current) {
+      isCfInitialMount.current = false;
+      return;
+    }
+
+    if (!cloudflareConfig.enabled || !cloudflareConfig.autoSave) {
+      return;
+    }
+
+    setCloudflareSyncStatus('saving');
+    const timer = setTimeout(async () => {
+      const res = await saveDataToCloudflare(cloudflareConfig, budgetState);
+      if (res.success) {
+        setCloudflareSyncStatus('synced');
+        setCloudflareConfig((prev) => ({
+          ...prev,
+          lastSyncedAt: res.syncedAt,
+        }));
+      } else {
+        setCloudflareSyncStatus('error');
+      }
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [budgetState, cloudflareConfig]);
 
   const currentMonth: BudgetMonth = useMemo(() => {
     const month = budgetState.months[budgetState.currentMonthId] || Object.values(budgetState.months)[0];
@@ -505,6 +560,8 @@ export default function App() {
         gitHubSyncStatus={gitHubSyncStatus}
         isGitHubConnected={Boolean(gitHubConfig.enabled && gitHubConfig.token && gitHubConfig.repo)}
         lastSyncedCommit={gitHubConfig.lastCommitSha}
+        cloudflareSyncStatus={cloudflareSyncStatus}
+        isCloudflareConnected={Boolean(cloudflareConfig.enabled && (cloudflareConfig.apiToken || cloudflareConfig.workerEndpoint))}
         isDualPaneMode={isDualPaneMode}
         onToggleDualPaneMode={handleToggleDualPaneMode}
       />
@@ -847,9 +904,15 @@ export default function App() {
           setGitHubConfig(newCfg);
           saveGitHubConfig(newCfg);
         }}
+        cloudflareConfig={cloudflareConfig}
+        onUpdateCloudflareConfig={(newCfg) => {
+          setCloudflareConfig(newCfg);
+          saveCloudflareConfig(newCfg);
+        }}
         initialTab={dataModalTab}
         onSyncSuccess={() => {
           setGitHubSyncStatus('synced');
+          setCloudflareSyncStatus('synced');
         }}
       />
 
@@ -887,3 +950,4 @@ export default function App() {
     </div>
   );
 }
+

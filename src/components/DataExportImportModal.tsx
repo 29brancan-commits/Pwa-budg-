@@ -7,6 +7,11 @@ import {
   saveDataToGitHub, 
   loadDataFromGitHub 
 } from '../utils/githubSync';
+import {
+  CloudflareConfig,
+  saveDataToCloudflare,
+  loadDataFromCloudflare
+} from '../utils/cloudflareSync';
 import { APP_VERSION } from '../utils/version';
 import { 
   X, 
@@ -18,13 +23,13 @@ import {
   FileSpreadsheet, 
   FileCode,
   Github,
-  Cloud,
   CheckCircle2,
   AlertCircle,
   ExternalLink,
   ShieldCheck,
   Eye,
-  EyeOff
+  EyeOff,
+  Server
 } from 'lucide-react';
 
 interface DataExportImportModalProps {
@@ -35,6 +40,8 @@ interface DataExportImportModalProps {
   currentMonth: BudgetMonth;
   gitHubConfig: GitHubConfig;
   onUpdateGitHubConfig: (config: GitHubConfig) => void;
+  cloudflareConfig: CloudflareConfig;
+  onUpdateCloudflareConfig: (config: CloudflareConfig) => void;
   initialTab?: 'github' | 'backup' | 'cloudflare';
   onSyncSuccess?: () => void;
 }
@@ -47,6 +54,8 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
   currentMonth,
   gitHubConfig,
   onUpdateGitHubConfig,
+  cloudflareConfig,
+  onUpdateCloudflareConfig,
   initialTab = 'github',
   onSyncSuccess,
 }) => {
@@ -65,7 +74,7 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
   const [ghSkipCi, setGhSkipCi] = useState(gitHubConfig.skipCi ?? true);
   const [showToken, setShowToken] = useState(false);
 
-  // Verification & sync UI state
+  // GitHub verification & sync UI state
   const [isVerifying, setIsVerifying] = useState(false);
   const [verifiedUser, setVerifiedUser] = useState<string | null>(null);
   const [verifiedAvatar, setVerifiedAvatar] = useState<string | null>(null);
@@ -78,6 +87,25 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
   const [isLoadingFromGitHub, setIsLoadingFromGitHub] = useState(false);
   const [loadGHSuccess, setLoadGHSuccess] = useState<string | null>(null);
   const [loadGHError, setLoadGHError] = useState<string | null>(null);
+
+  // Cloudflare local form state
+  const [cfEnabled, setCfEnabled] = useState(cloudflareConfig.enabled);
+  const [cfMode, setCfMode] = useState<'kv' | 'worker_endpoint'>(cloudflareConfig.mode || 'kv');
+  const [cfAccountId, setCfAccountId] = useState(cloudflareConfig.accountId || '');
+  const [cfKvNamespaceId, setCfKvNamespaceId] = useState(cloudflareConfig.kvNamespaceId || '');
+  const [cfApiToken, setCfApiToken] = useState(cloudflareConfig.apiToken || '');
+  const [cfWorkerEndpoint, setCfWorkerEndpoint] = useState(cloudflareConfig.workerEndpoint || '');
+  const [cfSyncKey, setCfSyncKey] = useState(cloudflareConfig.syncKey || 'flowledger_budget_data');
+  const [cfAutoSave, setCfAutoSave] = useState(cloudflareConfig.autoSave ?? true);
+  const [showCfToken, setShowCfToken] = useState(false);
+
+  const [isSavingToCF, setIsSavingToCF] = useState(false);
+  const [saveCFSuccess, setSaveCFSuccess] = useState<string | null>(null);
+  const [saveCFError, setSaveCFError] = useState<string | null>(null);
+
+  const [isLoadingFromCF, setIsLoadingFromCF] = useState(false);
+  const [loadCFSuccess, setLoadCFSuccess] = useState<string | null>(null);
+  const [loadCFError, setLoadCFError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -97,7 +125,6 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
       if (!ghOwner) {
         setGhOwner(res.username);
       }
-      // Auto-save configuration with updated owner
       const updated: GitHubConfig = {
         ...gitHubConfig,
         enabled: true,
@@ -173,6 +200,64 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
       setTimeout(() => setLoadGHSuccess(null), 4000);
     } else {
       setLoadGHError(res.error || 'Failed to load from GitHub');
+    }
+  };
+
+  // Save Cloudflare configuration helper
+  const handleSaveCloudflareConfig = () => {
+    const isConfigValid = cfMode === 'kv' 
+      ? Boolean(cfAccountId.trim() && cfKvNamespaceId.trim() && cfApiToken.trim())
+      : Boolean(cfWorkerEndpoint.trim());
+
+    const updated: CloudflareConfig = {
+      ...cloudflareConfig,
+      enabled: cfEnabled && isConfigValid,
+      mode: cfMode,
+      accountId: cfAccountId.trim(),
+      kvNamespaceId: cfKvNamespaceId.trim(),
+      apiToken: cfApiToken.trim(),
+      workerEndpoint: cfWorkerEndpoint.trim(),
+      syncKey: cfSyncKey.trim() || 'flowledger_budget_data',
+      autoSave: cfAutoSave,
+    };
+    onUpdateCloudflareConfig(updated);
+    return updated;
+  };
+
+  const handleSaveToCloudflareNow = async () => {
+    const currentConfig = handleSaveCloudflareConfig();
+    setIsSavingToCF(true);
+    setSaveCFError(null);
+    setSaveCFSuccess(null);
+
+    const res = await saveDataToCloudflare(currentConfig, state);
+    setIsSavingToCF(false);
+
+    if (res.success) {
+      setSaveCFSuccess(`Saved to Cloudflare! (${new Date(res.syncedAt!).toLocaleTimeString()})`);
+      if (onSyncSuccess) onSyncSuccess();
+      setTimeout(() => setSaveCFSuccess(null), 4000);
+    } else {
+      setSaveCFError(res.error || 'Failed to save to Cloudflare');
+    }
+  };
+
+  const handleLoadFromCloudflareNow = async () => {
+    const currentConfig = handleSaveCloudflareConfig();
+    setIsLoadingFromCF(true);
+    setLoadCFError(null);
+    setLoadCFSuccess(null);
+
+    const res = await loadDataFromCloudflare(currentConfig);
+    setIsLoadingFromCF(false);
+
+    if (res.success && res.state) {
+      onUpdateState(res.state);
+      setLoadCFSuccess('Successfully loaded latest data from Cloudflare!');
+      if (onSyncSuccess) onSyncSuccess();
+      setTimeout(() => setLoadCFSuccess(null), 4000);
+    } else {
+      setLoadCFError(res.error || 'Failed to load from Cloudflare');
     }
   };
 
@@ -274,7 +359,7 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -284,7 +369,7 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
         <div className="flex items-center gap-1.5 mt-4 p-1 bg-slate-950/60 rounded-xl border border-slate-800 text-xs">
           <button
             onClick={() => setActiveTab('github')}
-            className={`flex-1 py-1.5 rounded-lg font-semibold transition flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-1.5 rounded-lg font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === 'github'
                 ? 'bg-slate-800 text-white shadow'
                 : 'text-slate-400 hover:text-slate-200'
@@ -296,7 +381,7 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
 
           <button
             onClick={() => setActiveTab('backup')}
-            className={`flex-1 py-1.5 rounded-lg font-semibold transition flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-1.5 rounded-lg font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === 'backup'
                 ? 'bg-slate-800 text-white shadow'
                 : 'text-slate-400 hover:text-slate-200'
@@ -308,7 +393,7 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
 
           <button
             onClick={() => setActiveTab('cloudflare')}
-            className={`flex-1 py-1.5 rounded-lg font-semibold transition flex items-center justify-center gap-1.5 ${
+            className={`flex-1 py-1.5 rounded-lg font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === 'cloudflare'
                 ? 'bg-slate-800 text-white shadow'
                 : 'text-slate-400 hover:text-slate-200'
@@ -377,7 +462,7 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
                       type="button"
                       onClick={handleTestGitHubConnection}
                       disabled={isVerifying || !ghToken.trim()}
-                      className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-emerald-400 font-semibold text-[10px] disabled:opacity-40 transition"
+                      className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-emerald-400 font-semibold text-[10px] disabled:opacity-40 transition cursor-pointer"
                     >
                       {isVerifying ? 'Checking...' : 'Verify'}
                     </button>
@@ -544,7 +629,7 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
                 type="button"
                 onClick={handleLoadFromGitHubNow}
                 disabled={isLoadingFromGitHub || !ghToken.trim()}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold transition border border-slate-700 disabled:opacity-40"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold transition border border-slate-700 disabled:opacity-40 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5 text-blue-400" />
                 <span>{isLoadingFromGitHub ? 'Downloading...' : 'Load from GitHub'}</span>
@@ -554,7 +639,7 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
                 type="button"
                 onClick={handleSaveToGitHubNow}
                 disabled={isSavingToGitHub || !ghToken.trim()}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold transition shadow-sm active:scale-95 disabled:opacity-40"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold transition shadow-sm active:scale-95 disabled:opacity-40 cursor-pointer"
               >
                 {isSavingToGitHub ? (
                   <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -574,7 +659,7 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
                 onClick={handleDownloadJSON}
-                className="flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-800/80 border border-slate-700 hover:border-emerald-500/50 hover:bg-slate-800 text-slate-200 transition"
+                className="flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-800/80 border border-slate-700 hover:border-emerald-500/50 hover:bg-slate-800 text-slate-200 transition cursor-pointer"
               >
                 <FileCode className="w-4 h-4 text-emerald-400" />
                 <div className="text-left">
@@ -585,7 +670,7 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
 
               <button
                 onClick={handleDownloadCSV}
-                className="flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-800/80 border border-slate-700 hover:border-cyan-500/50 hover:bg-slate-800 text-slate-200 transition"
+                className="flex items-center justify-center gap-2 p-3 rounded-xl bg-slate-800/80 border border-slate-700 hover:border-cyan-500/50 hover:bg-slate-800 text-slate-200 transition cursor-pointer"
               >
                 <FileSpreadsheet className="w-4 h-4 text-cyan-400" />
                 <div className="text-left">
@@ -601,7 +686,7 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
                 <span className="font-semibold text-slate-200">Clipboard Backup</span>
                 <button
                   onClick={handleCopyJSON}
-                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-medium transition flex items-center gap-1"
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-medium transition flex items-center gap-1 cursor-pointer"
                 >
                   {copiedJSON ? <Check className="w-3 h-3 text-emerald-400" /> : <Download className="w-3 h-3" />}
                   <span>{copiedJSON ? 'Copied!' : 'Copy JSON'}</span>
@@ -656,7 +741,7 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
                 <button
                   onClick={handleImportText}
                   disabled={!importText.trim()}
-                  className="px-3 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-slate-950 font-bold text-xs transition"
+                  className="px-3 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-slate-950 font-bold text-xs transition cursor-pointer"
                 >
                   Apply Backup
                 </button>
@@ -673,13 +758,13 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setShowResetConfirm(false)}
-                      className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 text-[11px]"
+                      className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 text-[11px] cursor-pointer"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={handleReset}
-                      className="px-2.5 py-1 rounded-lg bg-rose-500 text-white font-bold text-[11px]"
+                      className="px-2.5 py-1 rounded-lg bg-rose-500 text-white font-bold text-[11px] cursor-pointer"
                     >
                       Confirm Reset
                     </button>
@@ -692,7 +777,7 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
                   </span>
                   <button
                     onClick={() => setShowResetConfirm(true)}
-                    className="text-slate-400 hover:text-rose-400 transition text-[11px] underline"
+                    className="text-slate-400 hover:text-rose-400 transition text-[11px] underline cursor-pointer"
                   >
                     Reset all data to empty template
                   </button>
@@ -702,25 +787,286 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
           </div>
         )}
 
-        {/* TAB 3: CLOUDFLARE HOSTING GUIDE */}
+        {/* TAB 3: CLOUDFLARE SYNC & HOSTING GUIDE */}
         {activeTab === 'cloudflare' && (
-          <div className="mt-4 space-y-3.5 text-xs">
-            <div className="p-3.5 rounded-xl bg-orange-950/20 border border-orange-500/30">
-              <span className="font-bold text-orange-400 block mb-1 text-sm">
-                Deploying to Cloudflare Workers / Pages
-              </span>
-              <p className="text-slate-300 text-[11px] leading-relaxed">
-                FlowLedger is built with static assets configured for Cloudflare Workers & Pages.
-              </p>
+          <div className="mt-4 space-y-4 text-xs">
+            {/* Banner */}
+            <div className="p-3.5 rounded-xl bg-orange-950/20 border border-orange-500/30 flex items-start gap-2.5">
+              <Globe className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-orange-300">
+                  Cloudflare Data Synchronization & Worker Storage
+                </p>
+                <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">
+                  Save and sync your FlowLedger budget state directly to Cloudflare KV or custom Cloudflare Worker endpoints so your data is retained across all devices and browser tabs!
+                </p>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800">
-                <span className="font-semibold text-slate-200 block mb-1">
-                  1. Deploy Command
+            {/* Cloudflare Sync Configuration Form */}
+            <div className="p-3.5 rounded-xl bg-slate-950/40 border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={cfEnabled}
+                    onChange={(e) => {
+                      setCfEnabled(e.target.checked);
+                      handleSaveCloudflareConfig();
+                    }}
+                    className="w-4 h-4 rounded text-orange-500 bg-slate-900 border-slate-700 focus:ring-0 cursor-pointer"
+                  />
+                  <span className="font-bold text-slate-200">Enable Cloudflare Sync</span>
+                </label>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  {cfEnabled ? 'Active' : 'Disabled'}
                 </span>
-                <p className="text-slate-400 text-[11px] mb-2">
-                  In your repository or terminal, deploy with:
+              </div>
+
+              {/* Mode Selector */}
+              <div>
+                <label className="block font-medium text-slate-300 mb-1.5">
+                  Cloudflare Integration Method:
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCfMode('kv');
+                      handleSaveCloudflareConfig();
+                    }}
+                    className={`p-2 rounded-xl border text-left transition flex items-center gap-2 cursor-pointer ${
+                      cfMode === 'kv'
+                        ? 'bg-orange-500/15 border-orange-500/40 text-white'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Globe className="w-4 h-4 text-orange-400 shrink-0" />
+                    <div>
+                      <strong className="block text-[11px]">Cloudflare KV (REST API)</strong>
+                      <span className="text-[9px] text-slate-400">Direct KV Storage</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCfMode('worker_endpoint');
+                      handleSaveCloudflareConfig();
+                    }}
+                    className={`p-2 rounded-xl border text-left transition flex items-center gap-2 cursor-pointer ${
+                      cfMode === 'worker_endpoint'
+                        ? 'bg-orange-500/15 border-orange-500/40 text-white'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Server className="w-4 h-4 text-orange-400 shrink-0" />
+                    <div>
+                      <strong className="block text-[11px]">Worker Endpoint</strong>
+                      <span className="text-[9px] text-slate-400">Custom Worker Proxy</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Form Mode 1: Cloudflare KV REST API Direct */}
+              {cfMode === 'kv' ? (
+                <div className="space-y-3 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-medium text-slate-300 mb-1">
+                        Cloudflare Account ID *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 4a8b...99"
+                        value={cfAccountId}
+                        onChange={(e) => setCfAccountId(e.target.value)}
+                        className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-medium text-slate-300 mb-1">
+                        KV Namespace ID *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 81f3...c2"
+                        value={cfKvNamespaceId}
+                        onChange={(e) => setCfKvNamespaceId(e.target.value)}
+                        className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-medium text-slate-300 mb-1">
+                      Cloudflare API Token *
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showCfToken ? 'text' : 'password'}
+                        placeholder="API Token with Workers KV Storage Read/Edit permissions"
+                        value={cfApiToken}
+                        onChange={(e) => setCfApiToken(e.target.value)}
+                        className="w-full pl-3 pr-10 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-orange-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCfToken(!showCfToken)}
+                        className="absolute right-2 top-1.5 text-slate-400 hover:text-slate-200"
+                      >
+                        {showCfToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Form Mode 2: Worker Endpoint */
+                <div className="space-y-3 pt-1">
+                  <div>
+                    <label className="block font-medium text-slate-300 mb-1">
+                      Cloudflare Worker Endpoint URL *
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://pwa-budgv2.86brancan.workers.dev/sync"
+                      value={cfWorkerEndpoint}
+                      onChange={(e) => setCfWorkerEndpoint(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-orange-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-medium text-slate-300 mb-1">
+                      Bearer / API Secret Token (Optional)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showCfToken ? 'text' : 'password'}
+                        placeholder="Optional authentication header token"
+                        value={cfApiToken}
+                        onChange={(e) => setCfApiToken(e.target.value)}
+                        className="w-full pl-3 pr-10 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-orange-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCfToken(!showCfToken)}
+                        className="absolute right-2 top-1.5 text-slate-400 hover:text-slate-200"
+                      >
+                        {showCfToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Shared Storage Key Name */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                  <label className="block font-medium text-slate-300 mb-1">
+                    Cloudflare Storage Key
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="flowledger_budget_data"
+                    value={cfSyncKey}
+                    onChange={(e) => setCfSyncKey(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+
+                <div className="flex items-end">
+                  <label className="flex items-center gap-2 cursor-pointer select-none pb-1.5">
+                    <input
+                      type="checkbox"
+                      checked={cfAutoSave}
+                      onChange={(e) => {
+                        setCfAutoSave(e.target.checked);
+                        handleSaveCloudflareConfig();
+                      }}
+                      className="w-4 h-4 rounded text-orange-500 bg-slate-900 border-slate-700 focus:ring-0 cursor-pointer"
+                    />
+                    <span className="font-semibold text-slate-200">
+                      Auto-Save to Cloudflare on update
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Last synced timestamp */}
+              {cloudflareConfig.lastSyncedAt && (
+                <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+                  <span>Last synced: <strong>{new Date(cloudflareConfig.lastSyncedAt).toLocaleString()}</strong></span>
+                  <span className="font-mono text-orange-400 px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800">
+                    key: {cloudflareConfig.syncKey || 'flowledger_budget_data'}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Cloudflare Feedback Messages */}
+            {saveCFSuccess && (
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{saveCFSuccess}</span>
+              </div>
+            )}
+            {saveCFError && (
+              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{saveCFError}</span>
+              </div>
+            )}
+            {loadCFSuccess && (
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{loadCFSuccess}</span>
+              </div>
+            )}
+            {loadCFError && (
+              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{loadCFError}</span>
+              </div>
+            )}
+
+            {/* Cloudflare Action Buttons */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={handleLoadFromCloudflareNow}
+                disabled={isLoadingFromCF}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold transition border border-slate-700 disabled:opacity-40 cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 text-blue-400" />
+                <span>{isLoadingFromCF ? 'Pulling...' : 'Pull from Cloudflare'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSaveToCloudflareNow}
+                disabled={isSavingToCF}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-slate-950 font-bold transition shadow-sm active:scale-95 disabled:opacity-40 cursor-pointer"
+              >
+                {isSavingToCF ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Upload className="w-3.5 h-3.5" />
+                )}
+                <span>{isSavingToCF ? 'Syncing...' : 'Push & Save to Cloudflare'}</span>
+              </button>
+            </div>
+
+            {/* Deployment & Wrangler Guide */}
+            <div className="pt-3 border-t border-slate-800 space-y-2">
+              <div className="p-3.5 rounded-xl bg-slate-950/40 border border-slate-800">
+                <span className="font-bold text-orange-400 block mb-1">
+                  Deploying to Cloudflare Workers / Pages
+                </span>
+                <p className="text-slate-300 text-[11px] leading-relaxed mb-2">
+                  FlowLedger is fully pre-configured for static single-page deployments on Cloudflare Workers & Pages.
                 </p>
                 <code className="block p-2 rounded-lg bg-slate-900 border border-slate-800 text-emerald-400 font-mono text-[11px]">
                   npx wrangler deploy
@@ -729,19 +1075,10 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
 
               <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800">
                 <span className="font-semibold text-slate-200 block mb-1">
-                  2. Single Page App Configuration
+                  Single Page App Routing
                 </span>
                 <p className="text-slate-400 text-[11px]">
-                  Our <code className="text-slate-200">wrangler.jsonc</code> is pre-configured with <code className="text-emerald-400 font-mono">not_found_handling: "single-page-application"</code> to route all URLs directly to <code className="text-slate-200">index.html</code>.
-                </p>
-              </div>
-
-              <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800">
-                <span className="font-semibold text-slate-200 block mb-1">
-                  3. If Cloudflare says "No URLs enabled"
-                </span>
-                <p className="text-slate-400 text-[11px] leading-relaxed">
-                  Go to your <strong>Cloudflare Dashboard → Workers & Pages → pwa-budgv2 → Settings → Domains & Routes</strong> and enable the <code className="text-emerald-400 font-mono">workers.dev</code> route or attach your custom domain.
+                  Our <code className="text-slate-200">wrangler.jsonc</code> includes <code className="text-emerald-400 font-mono">not_found_handling: "single-page-application"</code> to route all URLs directly to <code className="text-slate-200">index.html</code>.
                 </p>
               </div>
             </div>
@@ -751,3 +1088,4 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
     </div>
   );
 };
+

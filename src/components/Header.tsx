@@ -10,6 +10,7 @@ import {
   Building2,
   SlidersHorizontal,
   Github,
+  Globe,
   Columns2
 } from 'lucide-react';
 import { APP_VERSION } from '../utils/version';
@@ -31,6 +32,8 @@ interface HeaderProps {
   gitHubSyncStatus?: 'idle' | 'saving' | 'synced' | 'error';
   isGitHubConnected?: boolean;
   lastSyncedCommit?: string;
+  cloudflareSyncStatus?: 'idle' | 'saving' | 'synced' | 'error';
+  isCloudflareConnected?: boolean;
   isDualPaneMode?: boolean;
   onToggleDualPaneMode?: () => void;
 }
@@ -49,6 +52,8 @@ export const Header: React.FC<HeaderProps> = ({
   gitHubSyncStatus = 'idle',
   isGitHubConnected = false,
   lastSyncedCommit,
+  cloudflareSyncStatus = 'idle',
+  isCloudflareConnected = false,
   isDualPaneMode = false,
   onToggleDualPaneMode,
 }) => {
@@ -255,8 +260,52 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           <button
+            onClick={() => onOpenDataModal('cloudflare')}
+            title={
+              isCloudflareConnected
+                ? cloudflareSyncStatus === 'saving'
+                  ? 'Saving changes to Cloudflare...'
+                  : cloudflareSyncStatus === 'error'
+                  ? 'Cloudflare sync error - click to fix'
+                  : 'Cloudflare Sync Active'
+                : 'Configure Cloudflare Sync'
+            }
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold transition whitespace-nowrap cursor-pointer touch-manipulation active:scale-95 shrink-0 ${
+              isCloudflareConnected
+                ? cloudflareSyncStatus === 'error'
+                  ? 'bg-rose-500/15 border-rose-500/30 text-rose-300'
+                  : cloudflareSyncStatus === 'saving'
+                  ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+                  : 'bg-orange-500/15 border-orange-500/30 text-orange-400'
+                : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5 text-orange-400" />
+            <span>
+              {isCloudflareConnected
+                ? cloudflareSyncStatus === 'saving'
+                  ? 'CF Syncing...'
+                  : cloudflareSyncStatus === 'error'
+                  ? 'CF Error'
+                  : 'Cloudflare'
+                : 'Cloudflare'}
+            </span>
+            {isCloudflareConnected && (
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  cloudflareSyncStatus === 'saving'
+                    ? 'bg-amber-400 animate-pulse'
+                    : cloudflareSyncStatus === 'error'
+                    ? 'bg-rose-400'
+                    : 'bg-orange-400'
+                }`}
+              />
+            )}
+          </button>
+
+          <button
             onClick={() => onOpenDataModal('backup')}
-            title="Backup, Export & Cloudflare Hosting"
+            title="Backup & File Export"
             className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 text-xs transition cursor-pointer touch-manipulation active:scale-95 shrink-0"
           >
             <Database className="w-3.5 h-3.5" />
@@ -268,3 +317,4 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
+

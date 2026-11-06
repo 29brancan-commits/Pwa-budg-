@@ -6,12 +6,28 @@
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
-/* Safe area padding for iOS standalone PWA */
+/* Safe area padding for iOS standalone PWA & Duo foldables */
 .pt-safe {
-  padding-top: env(safe-area-inset-top, 0px);
+  padding-top: max(env(safe-area-inset-top, 0px), 0px);
 }
 .pb-safe {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
+}
+.pr-safe {
+  padding-right: max(env(safe-area-inset-right, 0px), 0px);
+}
+.pl-safe {
+  padding-left: max(env(safe-area-inset-left, 0px), 0px);
+}
+
+/* Edge overlay safe padding for iPhone Duo / foldables with side floating status widget */
+.duo-edge-safe {
+  padding-right: max(env(safe-area-inset-right, 0px), 3.25rem);
+}
+@media (min-width: 768px) {
+  .duo-edge-safe {
+    padding-right: max(env(safe-area-inset-right, 0px), 1.5rem);
+  }
 }
 
 /* Custom scrollbars */

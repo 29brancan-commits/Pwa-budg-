@@ -41,6 +41,14 @@ export default function App() {
   const [gitHubSyncStatus, setGitHubSyncStatus] = useState<'idle' | 'saving' | 'synced' | 'error'>('idle');
   const [dataModalTab, setDataModalTab] = useState<'github' | 'backup' | 'cloudflare'>('github');
 
+  // Duo Dual-Screen Mode State (Opened = 2 panes side-by-side; Closed = single column stacked)
+  const [isDualPaneMode, setIsDualPaneMode] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 1024;
+    }
+    return false;
+  });
+
   // Modals state
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<ExpenseItem | null>(null);
@@ -407,97 +415,190 @@ export default function App() {
         gitHubSyncStatus={gitHubSyncStatus}
         isGitHubConnected={Boolean(gitHubConfig.enabled && gitHubConfig.token && gitHubConfig.repo)}
         lastSyncedCommit={gitHubConfig.lastCommitSha}
+        isDualPaneMode={isDualPaneMode}
+        onToggleDualPaneMode={() => setIsDualPaneMode((prev) => !prev)}
       />
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 py-5 pb-24 md:pb-12">
-        {/* Bank Accounts Section with Editable Balances & Real-Time Leftover Calculation */}
-        <section aria-label="Bank Accounts & Leftover Runway">
-          <BankAccountCards
-            accounts={currentMonth.accounts}
-            expenses={currentMonth.expenses}
-            incomes={currentMonth.incomes}
-            currency={currency}
-            onUpdateAccountBalance={handleUpdateAccountBalance}
-            onOpenManageAccounts={() => setIsManageAccountsOpen(true)}
-            onOpenPaycheckCycles={() => setIsPaycheckCyclesOpen(true)}
-            onDeleteAccount={handleRequestDeleteAccount}
-            selectedAccountFilter={budgetState.selectedAccountFilter || 'all'}
-            onSelectAccountFilter={handleSelectAccountFilter}
-          />
-        </section>
-
-        {/* Dynamic Views According to Active Tab */}
-        {activeTab === 'ledger' && (
-          <section className="rounded-2xl bg-slate-900/40 border border-slate-800/80 p-4 lg:p-6 shadow-sm">
-            <ExpenseList
-              expenses={currentMonth.expenses}
-              accounts={currentMonth.accounts}
-              paycheckCycles={currentMonth.paycheckCycles}
-              selectedAccountFilter={budgetState.selectedAccountFilter || 'all'}
-              onSelectAccountFilter={handleSelectAccountFilter}
-              currency={currency}
-              onToggleStatus={handleToggleExpenseStatus}
-              onEditExpense={(item) => {
-                setEditingExpense(item);
-                setIsAddExpenseOpen(true);
-              }}
-              onDeleteExpense={handleRequestDeleteExpense}
-              onAddNew={() => {
-                setEditingExpense(null);
-                setIsAddExpenseOpen(true);
-              }}
-              onOpenPaycheckCycles={() => setIsPaycheckCyclesOpen(true)}
-            />
-          </section>
-        )}
-
-        {activeTab === 'charts' && (
-          <div className="space-y-6">
-            {/* Top row: Cash Flow Waterfall & Category Donut */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="p-4 lg:p-6 rounded-2xl bg-slate-900/50 border border-slate-800/80 shadow-sm">
-                <CashFlowWaterfallChart
+      {/* Main Container with Duo edge overlay safe clearance on right */}
+      <main className="flex-1 max-w-7xl w-full mx-auto pl-3 sm:pl-4 lg:pl-8 pr-14 sm:pr-4 lg:pr-8 py-5 pb-24 md:pb-12">
+        {/* Duo Opened Dual-Screen Layout (Side-by-Side 2-Screen Panels) */}
+        {isDualPaneMode ? (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-start">
+            {/* Screen 1 (Left Pane): Bank Accounts & Leftover Runway */}
+            <div className="lg:col-span-5 space-y-4">
+              <section aria-label="Bank Accounts & Leftover Runway">
+                <BankAccountCards
+                  accounts={currentMonth.accounts}
                   expenses={currentMonth.expenses}
                   incomes={currentMonth.incomes}
+                  currency={currency}
+                  onUpdateAccountBalance={handleUpdateAccountBalance}
+                  onOpenManageAccounts={() => setIsManageAccountsOpen(true)}
+                  onOpenPaycheckCycles={() => setIsPaycheckCyclesOpen(true)}
+                  onDeleteAccount={handleRequestDeleteAccount}
+                  selectedAccountFilter={budgetState.selectedAccountFilter || 'all'}
+                  onSelectAccountFilter={handleSelectAccountFilter}
+                />
+              </section>
+            </div>
+
+            {/* Screen 2 (Right Pane): Active View (Ledger / Charts / Calendar / Debt) */}
+            <div className="lg:col-span-7 space-y-4">
+              {activeTab === 'ledger' && (
+                <section className="rounded-2xl bg-slate-900/40 border border-slate-800/80 p-4 lg:p-6 shadow-sm">
+                  <ExpenseList
+                    expenses={currentMonth.expenses}
+                    accounts={currentMonth.accounts}
+                    paycheckCycles={currentMonth.paycheckCycles}
+                    selectedAccountFilter={budgetState.selectedAccountFilter || 'all'}
+                    onSelectAccountFilter={handleSelectAccountFilter}
+                    currency={currency}
+                    onToggleStatus={handleToggleExpenseStatus}
+                    onEditExpense={(item) => {
+                      setEditingExpense(item);
+                      setIsAddExpenseOpen(true);
+                    }}
+                    onDeleteExpense={handleRequestDeleteExpense}
+                    onAddNew={() => {
+                      setEditingExpense(null);
+                      setIsAddExpenseOpen(true);
+                    }}
+                    onOpenPaycheckCycles={() => setIsPaycheckCyclesOpen(true)}
+                  />
+                </section>
+              )}
+
+              {activeTab === 'charts' && (
+                <div className="space-y-6">
+                  <div className="p-4 lg:p-6 rounded-2xl bg-slate-900/50 border border-slate-800/80 shadow-sm">
+                    <CashFlowWaterfallChart
+                      expenses={currentMonth.expenses}
+                      incomes={currentMonth.incomes}
+                      accounts={currentMonth.accounts}
+                      paycheckCycles={currentMonth.paycheckCycles}
+                      currency={currency}
+                    />
+                  </div>
+                  <div className="p-4 lg:p-6 rounded-2xl bg-slate-900/50 border border-slate-800/80 shadow-sm">
+                    <CategoryDonutChart
+                      expenses={currentMonth.expenses}
+                      currency={currency}
+                    />
+                  </div>
+                  <div className="p-4 lg:p-6 rounded-2xl bg-slate-900/50 border border-slate-800/80 shadow-sm">
+                    <SpendingTrendChart state={budgetState} />
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'calendar' && (
+                <div className="p-4 lg:p-6 rounded-2xl bg-slate-900/50 border border-slate-800/80 shadow-sm">
+                  <BillCalendarView
+                    expenses={currentMonth.expenses}
+                    currency={currency}
+                    onToggleStatus={handleToggleExpenseStatus}
+                  />
+                </div>
+              )}
+
+              {activeTab === 'debt' && (
+                <div className="p-4 lg:p-6 rounded-2xl bg-slate-900/50 border border-slate-800/80 shadow-sm">
+                  <DebtPayoffChart
+                    expenses={currentMonth.expenses}
+                    currency={currency}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* Duo Closed / Single Screen Stacked Layout */
+          <>
+            <section aria-label="Bank Accounts & Leftover Runway">
+              <BankAccountCards
+                accounts={currentMonth.accounts}
+                expenses={currentMonth.expenses}
+                incomes={currentMonth.incomes}
+                currency={currency}
+                onUpdateAccountBalance={handleUpdateAccountBalance}
+                onOpenManageAccounts={() => setIsManageAccountsOpen(true)}
+                onOpenPaycheckCycles={() => setIsPaycheckCyclesOpen(true)}
+                onDeleteAccount={handleRequestDeleteAccount}
+                selectedAccountFilter={budgetState.selectedAccountFilter || 'all'}
+                onSelectAccountFilter={handleSelectAccountFilter}
+              />
+            </section>
+
+            {activeTab === 'ledger' && (
+              <section className="rounded-2xl bg-slate-900/40 border border-slate-800/80 p-4 lg:p-6 shadow-sm">
+                <ExpenseList
+                  expenses={currentMonth.expenses}
                   accounts={currentMonth.accounts}
                   paycheckCycles={currentMonth.paycheckCycles}
+                  selectedAccountFilter={budgetState.selectedAccountFilter || 'all'}
+                  onSelectAccountFilter={handleSelectAccountFilter}
                   currency={currency}
+                  onToggleStatus={handleToggleExpenseStatus}
+                  onEditExpense={(item) => {
+                    setEditingExpense(item);
+                    setIsAddExpenseOpen(true);
+                  }}
+                  onDeleteExpense={handleRequestDeleteExpense}
+                  onAddNew={() => {
+                    setEditingExpense(null);
+                    setIsAddExpenseOpen(true);
+                  }}
+                  onOpenPaycheckCycles={() => setIsPaycheckCyclesOpen(true)}
+                />
+              </section>
+            )}
+
+            {activeTab === 'charts' && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="p-4 lg:p-6 rounded-2xl bg-slate-900/50 border border-slate-800/80 shadow-sm">
+                    <CashFlowWaterfallChart
+                      expenses={currentMonth.expenses}
+                      incomes={currentMonth.incomes}
+                      accounts={currentMonth.accounts}
+                      paycheckCycles={currentMonth.paycheckCycles}
+                      currency={currency}
+                    />
+                  </div>
+
+                  <div className="p-4 lg:p-6 rounded-2xl bg-slate-900/50 border border-slate-800/80 shadow-sm">
+                    <CategoryDonutChart
+                      expenses={currentMonth.expenses}
+                      currency={currency}
+                    />
+                  </div>
+                </div>
+
+                <div className="p-4 lg:p-6 rounded-2xl bg-slate-900/50 border border-slate-800/80 shadow-sm">
+                  <SpendingTrendChart state={budgetState} />
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'calendar' && (
+              <div className="p-4 lg:p-6 rounded-2xl bg-slate-900/50 border border-slate-800/80 shadow-sm">
+                <BillCalendarView
+                  expenses={currentMonth.expenses}
+                  currency={currency}
+                  onToggleStatus={handleToggleExpenseStatus}
                 />
               </div>
+            )}
 
+            {activeTab === 'debt' && (
               <div className="p-4 lg:p-6 rounded-2xl bg-slate-900/50 border border-slate-800/80 shadow-sm">
-                <CategoryDonutChart
+                <DebtPayoffChart
                   expenses={currentMonth.expenses}
                   currency={currency}
                 />
               </div>
-            </div>
-
-            {/* Bottom row: Multi-month trends */}
-            <div className="p-4 lg:p-6 rounded-2xl bg-slate-900/50 border border-slate-800/80 shadow-sm">
-              <SpendingTrendChart state={budgetState} />
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'calendar' && (
-          <div className="p-4 lg:p-6 rounded-2xl bg-slate-900/50 border border-slate-800/80 shadow-sm">
-            <BillCalendarView
-              expenses={currentMonth.expenses}
-              currency={currency}
-              onToggleStatus={handleToggleExpenseStatus}
-            />
-          </div>
-        )}
-
-        {activeTab === 'debt' && (
-          <div className="p-4 lg:p-6 rounded-2xl bg-slate-900/50 border border-slate-800/80 shadow-sm">
-            <DebtPayoffChart
-              expenses={currentMonth.expenses}
-              currency={currency}
-            />
-          </div>
+            )}
+          </>
         )}
       </main>
 

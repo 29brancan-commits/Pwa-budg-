@@ -9,7 +9,8 @@ import {
   ListFilter,
   Building2,
   SlidersHorizontal,
-  Github
+  Github,
+  Columns2
 } from 'lucide-react';
 
 export type ActiveTab = 'ledger' | 'charts' | 'calendar' | 'debt';
@@ -29,6 +30,8 @@ interface HeaderProps {
   gitHubSyncStatus?: 'idle' | 'saving' | 'synced' | 'error';
   isGitHubConnected?: boolean;
   lastSyncedCommit?: string;
+  isDualPaneMode?: boolean;
+  onToggleDualPaneMode?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -45,6 +48,8 @@ export const Header: React.FC<HeaderProps> = ({
   gitHubSyncStatus = 'idle',
   isGitHubConnected = false,
   lastSyncedCommit,
+  isDualPaneMode = false,
+  onToggleDualPaneMode,
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-4 lg:px-8 py-3 pt-safe">
@@ -127,8 +132,28 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </nav>
 
-        {/* Zone 3: Primary Action & Utilities */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Zone 3: Primary Action & Utilities (with safe right margin for iPhone Duo status overlay) */}
+        <div className="flex items-center gap-2 shrink-0 pr-14 sm:pr-0">
+          {/* Duo Dual-Screen Mode Toggle */}
+          {onToggleDualPaneMode && (
+            <button
+              onClick={onToggleDualPaneMode}
+              title={
+                isDualPaneMode
+                  ? 'Dual-Screen Mode Active (Opened Duo) - Click to switch to Single-Screen (Closed Duo)'
+                  : 'Switch to Dual-Screen 2-Pane View (for Opened Duo / Wide screen)'
+              }
+              className={`hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition whitespace-nowrap active:scale-95 ${
+                isDualPaneMode
+                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300 shadow-sm'
+                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+              }`}
+            >
+              <Columns2 className="w-3.5 h-3.5" />
+              <span>{isDualPaneMode ? 'Duo: Opened' : 'Duo: Closed'}</span>
+            </button>
+          )}
+
           {/* Incomes button */}
           <button
             onClick={onOpenIncomeModal}

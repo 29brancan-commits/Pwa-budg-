@@ -235,11 +235,13 @@ export const ManageAccountsModal: React.FC<ManageAccountsModalProps> = ({
                         Edit
                       </button>
                       <button
+                        type="button"
                         onClick={() => handleRequestDelete(acc.id)}
                         title="Delete Bank Account"
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition"
+                        className="px-2.5 py-1 rounded-lg text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-xs font-semibold flex items-center gap-1 transition"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete</span>
                       </button>
                     </div>
                   </div>

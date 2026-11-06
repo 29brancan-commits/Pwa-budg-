@@ -163,8 +163,8 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
           />
         </div>
 
-        {/* Filters Group */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0 text-xs shrink-0">
+        {/* Filters Group with safe right clearance */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0 text-xs shrink-0 pr-12 sm:pr-0">
           {/* Bank Account Selector Filter */}
           <div className="flex items-center p-0.5 bg-slate-900 border border-slate-800 rounded-lg shrink-0">
             <button

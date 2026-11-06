@@ -198,7 +198,7 @@ async function executeCloudflareKVFetch(params: {
   const token = params.apiToken.trim();
   const key = (params.key || 'flowledger_budget_data').trim();
 
-  // 1. Try local Express proxy endpoint (/api/cloudflare-kv) first to avoid CORS issues
+  // 1. Try local Express / Worker proxy endpoint (/api/cloudflare-kv)
   try {
     const proxyUrl = params.action === 'load' 
       ? `/api/cloudflare-kv?action=load&_t=${Date.now()}`
@@ -218,22 +218,14 @@ async function executeCloudflareKVFetch(params: {
 
     const contentType = proxyRes.headers.get('content-type') || '';
 
-    if (contentType.includes('text/html')) {
-      return {
-        resStatus: 0,
-        isNetworkError: true,
-        error: 'Cloudflare build update pending: Your live site is currently running an older build. Please click "Commit & Save to GitHub" under the GitHub Auto-Save tab so Cloudflare rebuilds with the updated proxy and .assetsignore!',
-      };
-    }
-
-    if (proxyRes.ok || proxyRes.status === 401 || proxyRes.status === 403 || proxyRes.status === 404) {
+    if (!contentType.includes('text/html') && (proxyRes.ok || proxyRes.status === 401 || proxyRes.status === 403 || proxyRes.status === 404)) {
       const data = await proxyRes.json().catch(() => null);
       if (data) {
         return { resStatus: proxyRes.status, data };
       }
     }
   } catch (proxyErr) {
-    // Proxy route failed or not reachable (e.g. static site), fallback to direct API
+    // Relative proxy route unavailable, fall through
   }
 
   // 2. Direct fetch to Cloudflare API endpoint
@@ -260,20 +252,41 @@ async function executeCloudflareKVFetch(params: {
       rawText = await directRes.text();
       data = JSON.parse(rawText);
     } catch {
-      // Direct payload might be plain string or json
+      // Plain text or JSON payload
     }
 
     return { resStatus: directRes.status, data, rawText };
-  } catch (err: any) {
-    const msg = err?.message || String(err);
-    const isTypeError = err?.name === 'TypeError' || msg.toLowerCase().includes('load failed') || msg.toLowerCase().includes('failed to fetch');
+  } catch (directErr: any) {
+    // 3. Fallback: Automated CORS Proxy (corsproxy.io) for direct browser calls from static hosts
+    try {
+      const corsProxyUrl = `https://corsproxy.io/?${encodeURIComponent(directUrl)}`;
+      const corsRes = await fetch(corsProxyUrl, {
+        method: params.method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...(params.method === 'PUT' ? { 'Content-Type': 'application/json' } : {}),
+        },
+        ...(params.method === 'PUT' && params.body ? { body: JSON.stringify(params.body) } : {}),
+      });
 
+      if (corsRes.ok || corsRes.status === 401 || corsRes.status === 403 || corsRes.status === 404) {
+        let data = null;
+        try {
+          data = await corsRes.json();
+        } catch {
+          // JSON parse
+        }
+        return { resStatus: corsRes.status, data };
+      }
+    } catch (corsErr) {
+      // CORS proxy fallback also failed
+    }
+
+    const msg = directErr?.message || String(directErr);
     return {
       resStatus: 0,
       isNetworkError: true,
-      error: isTypeError
-        ? 'CORS / Network Error: Direct browser fetch to api.cloudflare.com was blocked. Run "npx wrangler deploy" in your terminal to publish our included _worker.js proxy to your Workers domain!'
-        : `Network Error: ${msg}`,
+      error: `Network Error (${msg}). Please verify your Account ID, KV Namespace ID, and API Token.`,
     };
   }
 }

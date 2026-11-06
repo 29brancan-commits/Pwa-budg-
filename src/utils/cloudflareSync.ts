@@ -181,6 +181,92 @@ export function parseCloudflareSyncToken(tokenStr: string): CloudflareConfig | n
 }
 
 /**
+ * Helper to execute Cloudflare KV API operations via local backend proxy (/api/cloudflare-kv)
+ * or fall back to direct api.cloudflare.com fetch with CORS error handling.
+ */
+async function executeCloudflareKVFetch(params: {
+  method: 'GET' | 'PUT';
+  action: 'validate' | 'load' | 'save';
+  accountId: string;
+  kvNamespaceId: string;
+  apiToken: string;
+  key?: string;
+  body?: any;
+}): Promise<{ resStatus: number; data?: any; rawText?: string; isNetworkError?: boolean; error?: string }> {
+  const acc = params.accountId.trim();
+  const kv = params.kvNamespaceId.trim();
+  const token = params.apiToken.trim();
+  const key = (params.key || 'flowledger_budget_data').trim();
+
+  // 1. Try local Express proxy endpoint (/api/cloudflare-kv) first to avoid CORS issues
+  try {
+    const proxyUrl = params.action === 'load' 
+      ? `/api/cloudflare-kv?action=load&_t=${Date.now()}`
+      : `/api/cloudflare-kv?action=${params.action}`;
+
+    const proxyRes = await fetch(proxyUrl, {
+      method: params.method === 'PUT' ? 'POST' : 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'X-CF-Account-ID': acc,
+        'X-CF-KV-ID': kv,
+        'X-CF-Key': key,
+      },
+      ...(params.method === 'PUT' && params.body ? { body: JSON.stringify({ action: params.action, data: params.body }) } : {}),
+    });
+
+    if (proxyRes.ok || proxyRes.status === 401 || proxyRes.status === 403 || proxyRes.status === 404) {
+      const data = await proxyRes.json().catch(() => null);
+      return { resStatus: proxyRes.status, data };
+    }
+  } catch (proxyErr) {
+    // Proxy route failed or not reachable (e.g. static site), fallback to direct API
+  }
+
+  // 2. Direct fetch to Cloudflare API endpoint
+  let directUrl = `https://api.cloudflare.com/client/v4/accounts/${acc}/storage/kv/namespaces/${kv}/values/${key}`;
+  if (params.action === 'validate') {
+    directUrl = `https://api.cloudflare.com/client/v4/accounts/${acc}/storage/kv/namespaces/${kv}/keys?limit=1&_t=${Date.now()}`;
+  } else if (params.action === 'load') {
+    directUrl = `${directUrl}?_t=${Date.now()}`;
+  }
+
+  try {
+    const directRes = await fetch(directUrl, {
+      method: params.method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(params.method === 'PUT' ? { 'Content-Type': 'application/json' } : {}),
+      },
+      ...(params.method === 'PUT' && params.body ? { body: JSON.stringify(params.body) } : {}),
+    });
+
+    let data = null;
+    let rawText = '';
+    try {
+      rawText = await directRes.text();
+      data = JSON.parse(rawText);
+    } catch {
+      // Direct payload might be plain string or json
+    }
+
+    return { resStatus: directRes.status, data, rawText };
+  } catch (err: any) {
+    const msg = err?.message || String(err);
+    const isTypeError = err?.name === 'TypeError' || msg.toLowerCase().includes('load failed') || msg.toLowerCase().includes('failed to fetch');
+
+    return {
+      resStatus: 0,
+      isNetworkError: true,
+      error: isTypeError
+        ? 'Network / CORS Error: Direct browser requests to Cloudflare API (api.cloudflare.com) were blocked by browser CORS policy. Please make sure the app is running with dev/start server or use Worker Endpoint mode.'
+        : `Network Error: ${msg}`,
+    };
+  }
+}
+
+/**
  * Test & validate Cloudflare KV API credentials
  */
 export async function validateCloudflareCredentials(
@@ -196,40 +282,38 @@ export async function validateCloudflareCredentials(
     return { valid: false, error: 'Please enter your Account ID, KV Namespace ID, and API Token.' };
   }
 
-  // Query Cloudflare KV keys list API endpoint to verify read access
-  const url = `https://api.cloudflare.com/client/v4/accounts/${acc}/storage/kv/namespaces/${kv}/keys?limit=1&_t=${Date.now()}`;
+  const result = await executeCloudflareKVFetch({
+    method: 'GET',
+    action: 'validate',
+    accountId: acc,
+    kvNamespaceId: kv,
+    apiToken: token,
+  });
 
-  try {
-    const res = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (res.status === 401 || res.status === 403) {
-      return { 
-        valid: false, 
-        error: 'Invalid API Token or insufficient permissions. Ensure token has "Workers KV Storage: Edit" permissions.' 
-      };
-    }
-
-    if (res.status === 404) {
-      return { 
-        valid: false, 
-        error: 'Account ID or KV Namespace ID not found. Double check your Account ID and KV Namespace ID.' 
-      };
-    }
-
-    if (!res.ok) {
-      const errJson = await res.json().catch(() => ({}));
-      const msg = errJson.errors?.[0]?.message || errJson.message || `HTTP ${res.status}`;
-      return { valid: false, error: `Cloudflare Error: ${msg}` };
-    }
-
-    return { valid: true };
-  } catch (err: any) {
-    return { valid: false, error: err.message || 'Failed to connect to Cloudflare KV API.' };
+  if (result.isNetworkError || result.error) {
+    return { valid: false, error: result.error || 'Failed to connect to Cloudflare KV.' };
   }
+
+  if (result.resStatus === 401 || result.resStatus === 403) {
+    return {
+      valid: false,
+      error: 'Invalid API Token or insufficient permissions. Ensure token has "Workers KV Storage: Edit" permissions.',
+    };
+  }
+
+  if (result.resStatus === 404) {
+    return {
+      valid: false,
+      error: 'Account ID or KV Namespace ID not found. Double check your Account ID and KV Namespace ID.',
+    };
+  }
+
+  if (result.resStatus < 200 || result.resStatus >= 300) {
+    const msg = result.data?.errors?.[0]?.message || result.data?.message || `HTTP ${result.resStatus}`;
+    return { valid: false, error: `Cloudflare Error: ${msg}` };
+  }
+
+  return { valid: true };
 }
 
 /**
@@ -258,46 +342,44 @@ export async function saveDataToCloudflare(
       };
     }
 
-    const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${namespaceId}/values/${syncKey}`;
+    const result = await executeCloudflareKVFetch({
+      method: 'PUT',
+      action: 'save',
+      accountId,
+      kvNamespaceId: namespaceId,
+      apiToken: token,
+      key: syncKey,
+      body: state,
+    });
 
-    try {
-      const res = await fetch(url, {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(state),
-      });
-
-      if (res.status === 401 || res.status === 403) {
-        return {
-          success: false,
-          error: `Authentication Error (${res.status}): Please verify your API Token has "Workers KV Storage: Edit" permissions.`,
-        };
-      }
-
-      if (res.status === 404) {
-        return {
-          success: false,
-          error: 'Cloudflare Account ID or KV Namespace ID not found. Please double check your IDs.',
-        };
-      }
-
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        const msg = errJson.errors?.[0]?.message || errJson.message || `HTTP ${res.status}: ${res.statusText}`;
-        return { success: false, error: `Cloudflare KV API Error: ${msg}` };
-      }
-
-      const syncedAt = new Date().toISOString();
-      const updatedConfig = { ...config, lastSyncedAt: syncedAt };
-      saveCloudflareConfig(updatedConfig);
-
-      return { success: true, syncedAt };
-    } catch (err: any) {
-      return { success: false, error: err.message || 'Failed to connect to Cloudflare KV API.' };
+    if (result.isNetworkError || result.error) {
+      return { success: false, error: result.error || 'Failed to connect to Cloudflare KV.' };
     }
+
+    if (result.resStatus === 401 || result.resStatus === 403) {
+      return {
+        success: false,
+        error: `Authentication Error (${result.resStatus}): Please verify your API Token has "Workers KV Storage: Edit" permissions.`,
+      };
+    }
+
+    if (result.resStatus === 404) {
+      return {
+        success: false,
+        error: 'Cloudflare Account ID or KV Namespace ID not found. Please double check your IDs.',
+      };
+    }
+
+    if (result.resStatus < 200 || result.resStatus >= 300) {
+      const msg = result.data?.errors?.[0]?.message || result.data?.message || `HTTP ${result.resStatus}`;
+      return { success: false, error: `Cloudflare KV API Error: ${msg}` };
+    }
+
+    const syncedAt = new Date().toISOString();
+    const updatedConfig = { ...config, lastSyncedAt: syncedAt };
+    saveCloudflareConfig(updatedConfig);
+
+    return { success: true, syncedAt };
   }
 
   // Mode 2: Custom Cloudflare Worker Endpoint
@@ -345,7 +427,14 @@ export async function saveDataToCloudflare(
 
       return { success: true, syncedAt };
     } catch (err: any) {
-      return { success: false, error: err.message || 'Failed to reach Cloudflare Worker endpoint.' };
+      const msg = err?.message || String(err);
+      if (msg.toLowerCase().includes('load failed') || msg.toLowerCase().includes('failed to fetch') || err?.name === 'TypeError') {
+        return {
+          success: false,
+          error: `CORS / Network Error: Could not reach Worker Endpoint (${endpoint}). Ensure your Cloudflare Worker responds with Access-Control-Allow-Origin headers.`,
+        };
+      }
+      return { success: false, error: msg || 'Failed to reach Cloudflare Worker endpoint.' };
     }
   }
 
@@ -374,44 +463,44 @@ export async function loadDataFromCloudflare(
       return { success: false, error: 'Please enter your Cloudflare Account ID, KV Namespace ID, and API Token.' };
     }
 
-    const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${namespaceId}/values/${syncKey}?_t=${Date.now()}`;
+    const result = await executeCloudflareKVFetch({
+      method: 'GET',
+      action: 'load',
+      accountId,
+      kvNamespaceId: namespaceId,
+      apiToken: token,
+      key: syncKey,
+    });
 
-    try {
-      const res = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (res.status === 404) {
-        return { 
-          success: false, 
-          error: `Key "${syncKey}" not found in Cloudflare KV yet. Click "Push & Save to Cloudflare" to save your budget data first.` 
-        };
-      }
-
-      if (res.status === 401 || res.status === 403) {
-        return {
-          success: false,
-          error: `Authentication Error (${res.status}): Please verify your API Token has "Workers KV Storage: Edit" permissions.`,
-        };
-      }
-
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        const msg = errJson.errors?.[0]?.message || errJson.message || `HTTP ${res.status}`;
-        return { success: false, error: `Cloudflare KV Error: ${msg}` };
-      }
-
-      const parsedState = await res.json();
-      if (!parsedState || !parsedState.months || !parsedState.currentMonthId) {
-        return { success: false, error: 'Cloudflare KV data does not match FlowLedger BudgetState format.' };
-      }
-
-      return { success: true, state: parsedState };
-    } catch (err: any) {
-      return { success: false, error: err.message || 'Failed to fetch data from Cloudflare KV.' };
+    if (result.isNetworkError || result.error) {
+      return { success: false, error: result.error || 'Failed to fetch data from Cloudflare KV.' };
     }
+
+    if (result.resStatus === 404) {
+      return { 
+        success: false, 
+        error: `Key "${syncKey}" not found in Cloudflare KV yet. Click "Push & Save to Cloudflare" to save your budget data first.` 
+      };
+    }
+
+    if (result.resStatus === 401 || result.resStatus === 403) {
+      return {
+        success: false,
+        error: `Authentication Error (${result.resStatus}): Please verify your API Token has "Workers KV Storage: Edit" permissions.`,
+      };
+    }
+
+    if (result.resStatus < 200 || result.resStatus >= 300) {
+      const msg = result.data?.errors?.[0]?.message || result.data?.message || `HTTP ${result.resStatus}`;
+      return { success: false, error: `Cloudflare KV Error: ${msg}` };
+    }
+
+    const parsedState = result.data;
+    if (!parsedState || !parsedState.months || !parsedState.currentMonthId) {
+      return { success: false, error: 'Cloudflare KV data does not match FlowLedger BudgetState format.' };
+    }
+
+    return { success: true, state: parsedState };
   }
 
   // Mode 2: Worker Endpoint
@@ -458,7 +547,14 @@ export async function loadDataFromCloudflare(
 
       return { success: true, state };
     } catch (err: any) {
-      return { success: false, error: err.message || 'Failed to fetch from Cloudflare Worker.' };
+      const msg = err?.message || String(err);
+      if (msg.toLowerCase().includes('load failed') || msg.toLowerCase().includes('failed to fetch') || err?.name === 'TypeError') {
+        return {
+          success: false,
+          error: `CORS / Network Error: Could not reach Worker Endpoint (${endpoint}). Ensure your Cloudflare Worker returns Access-Control-Allow-Origin headers.`,
+        };
+      }
+      return { success: false, error: msg || 'Failed to fetch from Cloudflare Worker.' };
     }
   }
 

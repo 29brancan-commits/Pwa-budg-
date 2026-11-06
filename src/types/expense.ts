@@ -1,16 +1,5 @@
 export type ExpenseStatus = 'due' | 'paid' | 'pending';
 
-export type ExpenseCategory = 
-  | 'Housing' 
-  | 'Utilities' 
-  | 'Debt & Credit' 
-  | 'Auto & Transport' 
-  | 'Insurance & Health' 
-  | 'Subscriptions' 
-  | 'Family & Child Support' 
-  | 'Personal Loans' 
-  | 'Other';
-
 export interface PaycheckCycle {
   id: string; // e.g. "cycle-1", "cycle-2"
   label: string; // e.g. "1st Half (5th–18th)" or "Paycheck 1 (Nov 6 – Nov 19)"
@@ -31,7 +20,6 @@ export interface ExpenseItem {
   title: string;
   amount: number;
   dueDate: number; // Day of the month (1-31)
-  category: ExpenseCategory;
   payPeriod: string; // Configurable cycle id or 'both'
   status: ExpenseStatus;
   autoPay: boolean;

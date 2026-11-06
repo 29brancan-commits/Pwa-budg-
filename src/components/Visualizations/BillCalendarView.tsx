@@ -135,7 +135,7 @@ export const BillCalendarView: React.FC<BillCalendarViewProps> = ({
                   <div className="flex-1 truncate mr-2">
                     <span className="font-semibold text-slate-100 block truncate">{bill.title}</span>
                     <span className="text-[11px] text-slate-400 font-mono">
-                      {bill.category} · {bill.paymentMethod || 'Manual'}
+                      {bill.paymentMethod || 'Manual'}
                     </span>
                   </div>
 

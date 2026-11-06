@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ExpenseItem, ExpenseCategory, ExpenseStatus, BankAccount, PaycheckCycle } from '../types/expense';
+import { ExpenseItem, ExpenseStatus, BankAccount, PaycheckCycle } from '../types/expense';
 import { X, Trash2, Building2, SlidersHorizontal } from 'lucide-react';
 
 interface ExpenseModalProps {
@@ -13,18 +13,6 @@ interface ExpenseModalProps {
   onOpenPaycheckCycles?: () => void;
   currency?: string;
 }
-
-const CATEGORIES: ExpenseCategory[] = [
-  'Housing',
-  'Utilities',
-  'Debt & Credit',
-  'Auto & Transport',
-  'Insurance & Health',
-  'Subscriptions',
-  'Family & Child Support',
-  'Personal Loans',
-  'Other',
-];
 
 export const ExpenseModal: React.FC<ExpenseModalProps> = ({
   isOpen,
@@ -40,7 +28,6 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState<string>('');
   const [dueDate, setDueDate] = useState<number>(1);
-  const [category, setCategory] = useState<ExpenseCategory>('Housing');
   const [payPeriod, setPayPeriod] = useState<string>('both');
   const [status, setStatus] = useState<ExpenseStatus>('due');
   const [autoPay, setAutoPay] = useState(false);
@@ -53,7 +40,6 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
       setTitle(initialExpense.title);
       setAmount(initialExpense.amount.toString());
       setDueDate(initialExpense.dueDate);
-      setCategory(initialExpense.category);
       setPayPeriod(initialExpense.payPeriod);
       setStatus(initialExpense.status);
       setAutoPay(initialExpense.autoPay);
@@ -64,7 +50,6 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
       setTitle('');
       setAmount('');
       setDueDate(1);
-      setCategory('Housing');
       setPayPeriod(paycheckCycles[0]?.id || 'cycle-1');
       setStatus('due');
       setAutoPay(false);
@@ -106,7 +91,6 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
       title: title.trim(),
       amount: numAmount,
       dueDate: Math.min(31, Math.max(1, Number(dueDate))),
-      category,
       payPeriod,
       status,
       autoPay,
@@ -165,40 +149,23 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
             </div>
           </div>
 
-          {/* Assigned Bank Account & Category */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block font-medium text-slate-300 mb-1 flex items-center gap-1">
-                <Building2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Assigned Bank Account *</span>
-              </label>
-              <select
-                value={accountId}
-                onChange={(e) => setAccountId(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-800/80 border border-emerald-500/50 text-white font-semibold focus:outline-none focus:border-emerald-500"
-              >
-                {accounts.map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block font-medium text-slate-300 mb-1">Category</label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value as ExpenseCategory)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-800/80 border border-slate-700/80 text-white focus:outline-none focus:border-emerald-500"
-              >
-                {CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {/* Assigned Bank Account */}
+          <div>
+            <label className="block font-medium text-slate-300 mb-1 flex items-center gap-1">
+              <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Assigned Bank Account *</span>
+            </label>
+            <select
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-slate-800/80 border border-emerald-500/50 text-white font-semibold focus:outline-none focus:border-emerald-500"
+            >
+              {accounts.map((acc) => (
+                <option key={acc.id} value={acc.id}>
+                  {acc.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Due Date & Paycheck Cycle Assignment */}

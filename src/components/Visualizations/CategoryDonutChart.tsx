@@ -1,54 +1,53 @@
 import React, { useState, useMemo } from 'react';
-import { ExpenseItem, ExpenseCategory } from '../../types/expense';
+import { ExpenseItem, BankAccount } from '../../types/expense';
 
 interface CategoryDonutChartProps {
   expenses: ExpenseItem[];
+  accounts?: BankAccount[];
   currency?: string;
 }
 
-const CATEGORY_COLORS: Record<ExpenseCategory, string> = {
-  'Housing': '#10b981', // Emerald
-  'Utilities': '#06b6d4', // Cyan
-  'Debt & Credit': '#f59e0b', // Amber
-  'Auto & Transport': '#8b5cf6', // Violet
-  'Insurance & Health': '#3b82f6', // Blue
-  'Subscriptions': '#ec4899', // Pink
-  'Family & Child Support': '#14b8a6', // Teal
-  'Personal Loans': '#f97316', // Orange
-  'Other': '#64748b', // Slate
-};
-
 export const CategoryDonutChart: React.FC<CategoryDonutChartProps> = ({
   expenses,
+  accounts = [],
   currency = '$',
 }) => {
-  const [hoveredCategory, setHoveredCategory] = useState<ExpenseCategory | null>(null);
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
 
-  const categoryTotals = useMemo(() => {
-    const map = new Map<ExpenseCategory, { amount: number; count: number }>();
+  const accountTotals = useMemo(() => {
+    const map = new Map<string, { name: string; color: string; amount: number; count: number }>();
+    
     expenses.forEach((item) => {
-      const current = map.get(item.category) || { amount: 0, count: 0 };
-      map.set(item.category, {
+      const acc = accounts.find((a) => a.id === item.accountId) || {
+        id: item.accountId,
+        name: item.accountId,
+        color: '#94a3b8',
+      };
+      const key = acc.id || item.accountId;
+      const current = map.get(key) || { name: acc.name, color: acc.color || '#3b82f6', amount: 0, count: 0 };
+      map.set(key, {
+        ...current,
         amount: current.amount + item.amount,
         count: current.count + 1,
       });
     });
 
     const list = Array.from(map.entries())
-      .map(([category, data]) => ({
-        category,
+      .map(([id, data]) => ({
+        id,
+        name: data.name,
+        color: data.color,
         amount: data.amount,
         count: data.count,
-        color: CATEGORY_COLORS[category] || '#94a3b8',
       }))
       .sort((a, b) => b.amount - a.amount);
 
     const total = list.reduce((sum, item) => sum + item.amount, 0);
 
     return { list, total };
-  }, [expenses]);
+  }, [expenses, accounts]);
 
-  const { list, total } = categoryTotals;
+  const { list, total } = accountTotals;
 
   // Compute SVG arcs
   const radius = 70;
@@ -63,7 +62,6 @@ export const CategoryDonutChart: React.FC<CategoryDonutChartProps> = ({
     const endAngle = startAngle + sweepAngle;
     cumulativeAngle = endAngle;
 
-    // Convert angles to radians
     const startRad = (startAngle - 90) * (Math.PI / 180);
     const endRad = (endAngle - 90) * (Math.PI / 180);
 
@@ -95,29 +93,24 @@ export const CategoryDonutChart: React.FC<CategoryDonutChartProps> = ({
     };
   });
 
-  const activeItem = hoveredCategory
-    ? slices.find((s) => s.category === hoveredCategory)
-    : null;
+  const activeItem = hoveredKey ? slices.find((s) => s.id === hoveredKey) : null;
 
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-800">
         <div>
-          <h3 className="text-sm font-semibold text-slate-100">Category Breakdown</h3>
-          <p className="text-xs text-slate-400">Distribution across active budget items</p>
+          <h3 className="text-sm font-semibold text-slate-100">Bank Allocation Breakdown</h3>
+          <p className="text-xs text-slate-400">Total obligations allocated per bank account</p>
         </div>
         <span className="text-xs font-mono font-medium text-slate-400 tabular-nums">
-          {list.length} categories
+          {list.length} accounts
         </span>
       </div>
 
       <div className="flex flex-col sm:flex-row items-center justify-center gap-6 py-2">
         {/* Donut SVG */}
         <div className="relative w-48 h-48 shrink-0 flex items-center justify-center">
-          <svg
-            viewBox="0 0 180 180"
-            className="w-full h-full transform transition-transform duration-300"
-          >
+          <svg viewBox="0 0 180 180" className="w-full h-full">
             {slices.length === 0 ? (
               <circle
                 cx={center}
@@ -129,16 +122,16 @@ export const CategoryDonutChart: React.FC<CategoryDonutChartProps> = ({
               />
             ) : (
               slices.map((slice) => {
-                const isHovered = hoveredCategory === slice.category;
+                const isHovered = hoveredKey === slice.id;
                 return (
                   <path
-                    key={slice.category}
+                    key={slice.id}
                     d={slice.pathData}
                     fill={slice.color}
-                    opacity={hoveredCategory ? (isHovered ? 1 : 0.4) : 0.9}
+                    opacity={hoveredKey ? (isHovered ? 1 : 0.4) : 0.9}
                     className="cursor-pointer transition-all duration-200 hover:opacity-100"
-                    onMouseEnter={() => setHoveredCategory(slice.category)}
-                    onMouseLeave={() => setHoveredCategory(null)}
+                    onMouseEnter={() => setHoveredKey(slice.id)}
+                    onMouseLeave={() => setHoveredKey(null)}
                   />
                 );
               })
@@ -150,7 +143,7 @@ export const CategoryDonutChart: React.FC<CategoryDonutChartProps> = ({
             {activeItem ? (
               <>
                 <span className="text-[11px] font-medium text-slate-400 truncate max-w-[90px]">
-                  {activeItem.category}
+                  {activeItem.name}
                 </span>
                 <span className="text-base font-bold text-white font-mono tabular-nums leading-tight">
                   {currency}{activeItem.amount.toLocaleString()}
@@ -161,7 +154,7 @@ export const CategoryDonutChart: React.FC<CategoryDonutChartProps> = ({
               </>
             ) : (
               <>
-                <span className="text-[11px] font-medium text-slate-400">Total Spent</span>
+                <span className="text-[11px] font-medium text-slate-400">Total Obligations</span>
                 <span className="text-base font-bold text-white font-mono tabular-nums leading-tight">
                   {currency}{total.toLocaleString()}
                 </span>
@@ -175,11 +168,11 @@ export const CategoryDonutChart: React.FC<CategoryDonutChartProps> = ({
         <div className="w-full flex-1 max-h-48 overflow-y-auto pr-1 space-y-1.5">
           {slices.map((slice) => (
             <div
-              key={slice.category}
-              onMouseEnter={() => setHoveredCategory(slice.category)}
-              onMouseLeave={() => setHoveredCategory(null)}
+              key={slice.id}
+              onMouseEnter={() => setHoveredKey(slice.id)}
+              onMouseLeave={() => setHoveredKey(null)}
               className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition cursor-pointer ${
-                hoveredCategory === slice.category
+                hoveredKey === slice.id
                   ? 'bg-slate-800 text-white'
                   : 'hover:bg-slate-800/60 text-slate-300'
               }`}
@@ -189,7 +182,7 @@ export const CategoryDonutChart: React.FC<CategoryDonutChartProps> = ({
                   className="w-2.5 h-2.5 rounded-sm shrink-0"
                   style={{ backgroundColor: slice.color }}
                 />
-                <span className="truncate">{slice.category}</span>
+                <span className="truncate">{slice.name}</span>
               </div>
               <div className="flex items-center gap-2 shrink-0 font-mono tabular-nums text-right">
                 <span className="text-slate-200 font-medium">

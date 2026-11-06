@@ -726,6 +726,7 @@ export default function App() {
                   <div className="p-4 lg:p-6 rounded-2xl bg-slate-900/50 border border-slate-800/80 shadow-sm">
                     <CategoryDonutChart
                       expenses={currentMonth.expenses}
+                      accounts={currentMonth.accounts}
                       currency={currency}
                     />
                   </div>
@@ -813,6 +814,7 @@ export default function App() {
                   <div className="p-4 lg:p-6 rounded-2xl bg-slate-900/50 border border-slate-800/80 shadow-sm">
                     <CategoryDonutChart
                       expenses={currentMonth.expenses}
+                      accounts={currentMonth.accounts}
                       currency={currency}
                     />
                   </div>

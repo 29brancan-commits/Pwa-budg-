@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ExpenseItem, ExpenseCategory, ExpenseStatus, BankAccount, PaycheckCycle } from '../types/expense';
+import { ExpenseItem, ExpenseStatus, BankAccount, PaycheckCycle } from '../types/expense';
 import { 
   Search, 
   Check, 
@@ -44,7 +44,6 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
   onToggleAccount,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [periodFilter, setPeriodFilter] = useState<string>('all');
   const [sortField, setSortField] = useState<'dueDate' | 'amount' | 'title' | 'status'>('dueDate');
@@ -58,21 +57,15 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
           const matchesTitle = item.title.toLowerCase().includes(q);
-          const matchesCat = item.category.toLowerCase().includes(q);
           const matchesMethod = (item.paymentMethod || '').toLowerCase().includes(q);
           const matchesNotes = (item.notes || '').toLowerCase().includes(q);
-          if (!matchesTitle && !matchesCat && !matchesMethod && !matchesNotes) {
+          if (!matchesTitle && !matchesMethod && !matchesNotes) {
             return false;
           }
         }
 
         // Bank Account Filter
         if (selectedAccountFilter !== 'all' && item.accountId !== selectedAccountFilter) {
-          return false;
-        }
-
-        // Category
-        if (categoryFilter !== 'all' && item.category !== categoryFilter) {
           return false;
         }
 
@@ -110,7 +103,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
         }
         return sortDirection === 'asc' ? diff : -diff;
       });
-  }, [expenses, searchQuery, selectedAccountFilter, categoryFilter, statusFilter, periodFilter, sortField, sortDirection]);
+  }, [expenses, searchQuery, selectedAccountFilter, statusFilter, periodFilter, sortField, sortDirection]);
 
   const toggleSort = (field: 'dueDate' | 'amount' | 'title' | 'status') => {
     if (sortField === field) {
@@ -120,12 +113,6 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
       setSortDirection('asc');
     }
   };
-
-  const categories = useMemo(() => {
-    const set = new Set<string>();
-    expenses.forEach((e) => set.add(e.category));
-    return Array.from(set).sort();
-  }, [expenses]);
 
   const getAccount = (accountId: string) => {
     return accounts.find((a) => a.id === accountId) || { name: accountId, color: '#94a3b8' };
@@ -163,7 +150,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
           />
         </div>
 
-        {/* Filters Group - flex-wrap so no filters are clipped on mobile */}
+        {/* Filters Group */}
         <div className="flex flex-wrap items-center gap-2 text-xs">
           {/* Bank Account Selector Filter */}
           <div className="flex items-center p-0.5 bg-slate-900 border border-slate-800 rounded-lg shrink-0">
@@ -265,7 +252,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
               <button
                 onClick={onOpenPaycheckCycles}
                 title="Configure Pay Periods & Bi-Weekly Dates"
-                className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold text-emerald-400 hover:text-emerald-300 hover:bg-slate-800 transition whitespace-nowrap border-l border-slate-800 pl-2"
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold text-emerald-400 hover:text-emerald-300 hover:bg-slate-800 transition whitespace-nowrap border-l border-slate-800 pl-2 cursor-pointer"
               >
                 <SlidersHorizontal className="w-3 h-3 text-emerald-400" />
                 <span>Edit Periods</span>
@@ -273,21 +260,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
             )}
           </div>
 
-          {/* Category Dropdown */}
-          <select
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 text-[11px] focus:outline-none focus:border-emerald-500 shrink-0"
-          >
-            <option value="all">All Categories</option>
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-
-          {/* Add New Button (shown on sm+ screens; on mobile the top header button serves this) */}
+          {/* Add New Button */}
           <button
             onClick={onAddNew}
             className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition shadow-md shadow-emerald-500/20 shrink-0 active:scale-95 whitespace-nowrap cursor-pointer"
@@ -338,7 +311,6 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                 </div>
               </th>
               <th className="py-2.5 px-3">Bank Account</th>
-              <th className="py-2.5 px-3">Category</th>
               <th className="py-2.5 px-3">Pay Period</th>
               <th className="py-2.5 px-3">Payment Method</th>
               <th className="py-2.5 px-3 text-right cursor-pointer hover:text-white" onClick={() => toggleSort('amount')}>
@@ -359,7 +331,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
           <tbody className="divide-y divide-slate-800/60">
             {filteredExpenses.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-12 text-center text-slate-400">
+                <td colSpan={8} className="py-12 text-center text-slate-400">
                   <p className="text-sm font-semibold text-slate-300">
                     {expenses.length === 0 ? 'No expenses recorded yet' : 'No expenses match your search or filter'}
                   </p>
@@ -370,7 +342,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                     <div className="flex items-center justify-center gap-2 flex-wrap">
                       <button
                         onClick={onAddNew}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition cursor-pointer"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Add First Bill</span>
@@ -378,7 +350,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                       {onOpenPaycheckCycles && (
                         <button
                           onClick={onOpenPaycheckCycles}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 font-semibold text-xs border border-slate-700 transition"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 font-semibold text-xs border border-slate-700 transition cursor-pointer"
                         >
                           <SlidersHorizontal className="w-3.5 h-3.5" />
                           <span>Configure Pay Periods</span>
@@ -443,11 +415,6 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                       </span>
                     </td>
 
-                    {/* Category */}
-                    <td className="py-2 px-3 text-slate-400">
-                      {item.category}
-                    </td>
-
                     {/* Pay Period */}
                     <td className="py-2 px-3">
                       <span className="text-[11px] font-mono text-slate-400">
@@ -469,7 +436,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                     <td className="py-2 px-3 text-center">
                       <button
                         onClick={() => onToggleStatus(item.id)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold transition active:scale-95 ${
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold transition active:scale-95 cursor-pointer ${
                           isPaid
                             ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30'
                             : 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30'
@@ -495,14 +462,14 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                         <button
                           onClick={() => onEditExpense(item)}
                           title="Edit Obligation"
-                          className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                          className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => onDeleteExpense(item.id)}
                           title="Delete"
-                          className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition"
+                          className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition cursor-pointer"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -530,7 +497,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
               <div className="flex items-center justify-center gap-2 flex-wrap">
                 <button
                   onClick={onAddNew}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add First Bill</span>
@@ -538,7 +505,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                 {onOpenPaycheckCycles && (
                   <button
                     onClick={onOpenPaycheckCycles}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 font-semibold text-xs border border-slate-700 transition"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 font-semibold text-xs border border-slate-700 transition cursor-pointer"
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5" />
                     <span>Configure Pay Periods</span>
@@ -581,7 +548,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                       )}
                     </div>
                     <span className="text-[11px] text-slate-400 block mt-1">
-                      {item.category} · {getCycleLabel(item.payPeriod)} · {item.paymentMethod || 'Manual'}
+                      {getCycleLabel(item.payPeriod)} · {item.paymentMethod || 'Manual'}
                     </span>
                   </div>
 
@@ -596,7 +563,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                   {/* Status Toggle Button */}
                   <button
                     onClick={() => onToggleStatus(item.id)}
-                    className={`flex items-center justify-center gap-1.5 px-3 min-h-[44px] rounded-lg text-xs font-bold transition flex-1 active:scale-95 ${
+                    className={`flex items-center justify-center gap-1.5 px-3 min-h-[44px] rounded-lg text-xs font-bold transition flex-1 active:scale-95 cursor-pointer ${
                       isPaid
                         ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                         : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
@@ -618,14 +585,14 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
                   <div className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => onEditExpense(item)}
-                      className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-slate-800/80 text-slate-300 hover:text-white"
+                      className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-slate-800/80 text-slate-300 hover:text-white cursor-pointer"
                       aria-label="Edit"
                     >
                       <Edit3 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => onDeleteExpense(item.id)}
-                      className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-slate-800/80 text-slate-400 hover:text-rose-400"
+                      className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg bg-slate-800/80 text-slate-400 hover:text-rose-400 cursor-pointer"
                       aria-label="Delete"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -640,3 +607,4 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
     </div>
   );
 };
+

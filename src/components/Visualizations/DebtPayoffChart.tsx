@@ -14,8 +14,12 @@ export const DebtPayoffChart: React.FC<DebtPayoffChartProps> = ({
   const [strategy, setStrategy] = useState<'balance_desc' | 'balance_asc'>('balance_desc');
 
   const debtItems = useMemo(() => {
+    const debtKeywords = ['card', 'credit', 'loan', 'citi', 'chase', 'amex', 'discover', 'visa', 'mastercard', 'debt', 'mortgage', 'auto', 'car', 'loan', 'apr', 'interest'];
     return expenses
-      .filter((e) => e.category === 'Debt & Credit' || e.category === 'Personal Loans')
+      .filter((e) => {
+        const text = `${e.title} ${e.paymentMethod || ''} ${e.notes || ''}`.toLowerCase();
+        return debtKeywords.some((kw) => text.includes(kw));
+      })
       .sort((a, b) => (strategy === 'balance_desc' ? b.amount - a.amount : a.amount - b.amount));
   }, [expenses, strategy]);
 
@@ -101,7 +105,7 @@ export const DebtPayoffChart: React.FC<DebtPayoffChartProps> = ({
       <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
         {debtItems.length === 0 ? (
           <p className="text-xs text-slate-500 py-6 text-center">
-            No credit card or loan balances found. Add an obligation with category &apos;Debt &amp; Credit&apos; or &apos;Personal Loans&apos; to track payoff priorities here.
+            No credit card or loan balances found. Add a credit card or loan bill (e.g. Citi Card, Car Loan) to track payoff priorities here.
           </p>
         ) : (
           debtItems.map((item) => {

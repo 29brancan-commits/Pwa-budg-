@@ -329,7 +329,7 @@ export function importFromJSON(jsonString: string): BudgetState | null {
 }
 
 export function exportToCSV(month: BudgetMonth): string {
-  const headers = ['Title', 'Amount', 'Bank Account', 'Due Day', 'Category', 'Pay Period', 'Status', 'AutoPay', 'Payment Method', 'Notes'];
+  const headers = ['Title', 'Amount', 'Bank Account', 'Due Day', 'Pay Period', 'Status', 'AutoPay', 'Payment Method', 'Notes'];
   
   const rows = month.expenses.map((e) => {
     const accountName = month.accounts.find((a) => a.id === e.accountId)?.name || e.accountId;
@@ -338,7 +338,6 @@ export function exportToCSV(month: BudgetMonth): string {
       e.amount,
       `"${accountName}"`,
       e.dueDate,
-      `"${e.category}"`,
       e.payPeriod === 'period_1' ? '1st Half (5th-18th)' : e.payPeriod === 'period_2' ? '2nd Half (19th-2nd)' : 'Both',
       e.status.toUpperCase(),
       e.autoPay ? 'YES' : 'NO',

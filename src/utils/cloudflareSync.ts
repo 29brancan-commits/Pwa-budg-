@@ -216,9 +216,21 @@ async function executeCloudflareKVFetch(params: {
       ...(params.method === 'PUT' && params.body ? { body: JSON.stringify({ action: params.action, data: params.body }) } : {}),
     });
 
+    const contentType = proxyRes.headers.get('content-type') || '';
+
+    if (contentType.includes('text/html')) {
+      return {
+        resStatus: 0,
+        isNetworkError: true,
+        error: 'Cloudflare build update pending: Your live site is currently running an older build. Please click "Commit & Save to GitHub" under the GitHub Auto-Save tab so Cloudflare rebuilds with the updated proxy and .assetsignore!',
+      };
+    }
+
     if (proxyRes.ok || proxyRes.status === 401 || proxyRes.status === 403 || proxyRes.status === 404) {
       const data = await proxyRes.json().catch(() => null);
-      return { resStatus: proxyRes.status, data };
+      if (data) {
+        return { resStatus: proxyRes.status, data };
+      }
     }
   } catch (proxyErr) {
     // Proxy route failed or not reachable (e.g. static site), fallback to direct API

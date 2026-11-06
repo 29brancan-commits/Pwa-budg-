@@ -1063,9 +1063,24 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
               </div>
             )}
             {saveCFError && (
-              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{saveCFError}</span>
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs space-y-2">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span className="leading-relaxed">{saveCFError}</span>
+                </div>
+                {saveCFError.includes('405') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCfMode('kv');
+                      setSaveCFError(null);
+                      handleSaveCloudflareConfig();
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-slate-950 font-bold text-[11px] transition cursor-pointer"
+                  >
+                    Switch to Cloudflare KV (REST API) Mode
+                  </button>
+                )}
               </div>
             )}
             {loadCFSuccess && (
@@ -1075,9 +1090,24 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
               </div>
             )}
             {loadCFError && (
-              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{loadCFError}</span>
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs space-y-2">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span className="leading-relaxed">{loadCFError}</span>
+                </div>
+                {loadCFError.includes('405') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCfMode('kv');
+                      setLoadCFError(null);
+                      handleSaveCloudflareConfig();
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-slate-950 font-bold text-[11px] transition cursor-pointer"
+                  >
+                    Switch to Cloudflare KV (REST API) Mode
+                  </button>
+                )}
               </div>
             )}
 

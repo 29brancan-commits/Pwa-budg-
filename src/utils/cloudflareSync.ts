@@ -95,22 +95,12 @@ export function loadCloudflareConfig(): CloudflareConfig {
     const raw = localStorage.getItem(CLOUDFLARE_CONFIG_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
+      // Clean up legacy auto-set endpoints that point to static origin
+      if (parsed.mode === 'worker_endpoint' && parsed.workerEndpoint && parsed.workerEndpoint.includes('/api/sync')) {
+        parsed.mode = 'kv';
+        parsed.enabled = Boolean(parsed.accountId && parsed.kvNamespaceId && parsed.apiToken);
+      }
       return { ...DEFAULT_CLOUDFLARE_CONFIG, ...parsed };
-    }
-
-    // 3. Auto-detect if running on Cloudflare Workers / Cloudflare Pages domain (e.g. *.workers.dev)
-    const hostname = window.location.hostname;
-    if (hostname.endsWith('workers.dev') || hostname.endsWith('pages.dev')) {
-      const autoConfig: CloudflareConfig = {
-        ...DEFAULT_CLOUDFLARE_CONFIG,
-        enabled: true,
-        mode: 'worker_endpoint',
-        workerEndpoint: `${window.location.origin}/api/sync`,
-        syncKey: 'flowledger_budget_data',
-        autoSave: true,
-      };
-      saveCloudflareConfig(autoConfig);
-      return autoConfig;
     }
 
     return DEFAULT_CLOUDFLARE_CONFIG;
@@ -135,11 +125,11 @@ export function saveCloudflareConfig(config: CloudflareConfig): void {
 export function generateCloudflareSyncShareLink(config: CloudflareConfig): string {
   if (typeof window === 'undefined') return '';
   const payload = {
-    mode: config.mode,
-    accountId: config.accountId,
-    kvNamespaceId: config.kvNamespaceId,
-    apiToken: config.apiToken,
-    workerEndpoint: config.workerEndpoint,
+    mode: config.mode || 'kv',
+    accountId: config.accountId || '',
+    kvNamespaceId: config.kvNamespaceId || '',
+    apiToken: config.apiToken || '',
+    workerEndpoint: config.workerEndpoint || '',
     syncKey: config.syncKey || 'flowledger_budget_data',
   };
 
@@ -153,11 +143,11 @@ export function generateCloudflareSyncShareLink(config: CloudflareConfig): strin
  */
 export function generateCloudflareSyncToken(config: CloudflareConfig): string {
   const payload = {
-    m: config.mode,
-    a: config.accountId,
-    k: config.kvNamespaceId,
-    t: config.apiToken,
-    e: config.workerEndpoint,
+    m: config.mode || 'kv',
+    a: config.accountId || '',
+    k: config.kvNamespaceId || '',
+    t: config.apiToken || '',
+    e: config.workerEndpoint || '',
     s: config.syncKey || 'flowledger_budget_data',
   };
   return `CFSYNC:${btoa(JSON.stringify(payload))}`;
@@ -203,14 +193,17 @@ export async function saveDataToCloudflare(
 
   const syncKey = (config.syncKey || 'flowledger_budget_data').trim();
 
-  // Mode 1: Cloudflare KV REST API Direct
+  // Mode 1: Cloudflare KV REST API Direct (Recommended)
   if (config.mode === 'kv') {
     const accountId = (config.accountId || '').trim();
     const namespaceId = (config.kvNamespaceId || '').trim();
     const token = (config.apiToken || '').trim();
 
     if (!accountId || !namespaceId || !token) {
-      return { success: false, error: 'Cloudflare Account ID, KV Namespace ID, and API Token are required.' };
+      return { 
+        success: false, 
+        error: 'Please enter your Cloudflare Account ID, KV Namespace ID, and API Token to save to Cloudflare KV.' 
+      };
     }
 
     const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${namespaceId}/values/${syncKey}`;
@@ -228,7 +221,7 @@ export async function saveDataToCloudflare(
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
         const msg = errJson.errors?.[0]?.message || errJson.message || `HTTP ${res.status}: ${res.statusText}`;
-        return { success: false, error: `Cloudflare KV Error: ${msg}` };
+        return { success: false, error: `Cloudflare KV API Error: ${msg}` };
       }
 
       const syncedAt = new Date().toISOString();
@@ -254,17 +247,14 @@ export async function saveDataToCloudflare(
     };
 
     const payloadWrapped = JSON.stringify({ key: syncKey, data: state, state });
-    const payloadRaw = JSON.stringify(state);
 
     try {
-      // Attempt 1: PUT with wrapped payload (Standard REST / KV proxy)
       let res = await fetch(endpoint, {
         method: 'PUT',
         headers,
         body: payloadWrapped,
       });
 
-      // Attempt 2: If 405 Method Not Allowed, try POST with wrapped payload
       if (res.status === 405) {
         res = await fetch(endpoint, {
           method: 'POST',
@@ -273,25 +263,13 @@ export async function saveDataToCloudflare(
         });
       }
 
-      // Attempt 3: If 400 or 422, try raw state payload with PUT
-      if (res.status === 400 || res.status === 422) {
-        res = await fetch(endpoint, {
-          method: 'PUT',
-          headers,
-          body: payloadRaw,
-        });
-      }
-
-      // Attempt 4: If still 405, try POST with raw state payload
-      if (res.status === 405) {
-        res = await fetch(endpoint, {
-          method: 'POST',
-          headers,
-          body: payloadRaw,
-        });
-      }
-
       if (!res.ok) {
+        if (res.status === 405) {
+          return {
+            success: false,
+            error: `Static web app URL (${endpoint}) returned HTTP 405. Static file hosts reject POST/PUT requests. Please switch to 'Cloudflare KV (REST API)' mode below and enter your Cloudflare Account ID & KV Namespace ID.`,
+          };
+        }
         return { success: false, error: `Worker Endpoint HTTP ${res.status}: ${res.statusText}` };
       }
 
@@ -327,7 +305,7 @@ export async function loadDataFromCloudflare(
     const token = (config.apiToken || '').trim();
 
     if (!accountId || !namespaceId || !token) {
-      return { success: false, error: 'Cloudflare Account ID, KV Namespace ID, and API Token are required.' };
+      return { success: false, error: 'Please enter your Cloudflare Account ID, KV Namespace ID, and API Token.' };
     }
 
     const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${namespaceId}/values/${syncKey}?_t=${Date.now()}`;
@@ -340,7 +318,7 @@ export async function loadDataFromCloudflare(
       });
 
       if (res.status === 404) {
-        return { success: false, error: `Key "${syncKey}" not found in Cloudflare KV. Save data to create it.` };
+        return { success: false, error: `Key "${syncKey}" not found in Cloudflare KV. Click 'Push & Save' to create it.` };
       }
 
       if (!res.ok) {
@@ -378,7 +356,6 @@ export async function loadDataFromCloudflare(
 
       let res = await fetch(url, { headers });
 
-      // If GET returns 405 Method Not Allowed, try POST
       if (res.status === 405) {
         res = await fetch(endpoint, {
           method: 'POST',
@@ -388,6 +365,12 @@ export async function loadDataFromCloudflare(
       }
 
       if (!res.ok) {
+        if (res.status === 405) {
+          return {
+            success: false,
+            error: `Static site (${endpoint}) returned HTTP 405. Please switch to 'Cloudflare KV (REST API)' mode below.`,
+          };
+        }
         return { success: false, error: `Worker Endpoint HTTP ${res.status}: ${res.statusText}` };
       }
 

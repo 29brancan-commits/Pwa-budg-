@@ -1,6 +1,12 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { BudgetState, ExpenseItem, IncomeItem, BudgetMonth, ExpenseStatus, BankAccount, PaycheckCycle } from './types/expense';
-import { loadBudgetState, saveBudgetState, loadFromIndexedDB } from './utils/storage';
+import { 
+  loadBudgetState, 
+  saveBudgetState, 
+  loadFromIndexedDB, 
+  sanitizeBudgetState, 
+  PRIMARY_STORAGE_KEY 
+} from './utils/storage';
 import { 
   GitHubConfig, 
   loadGitHubConfig, 
@@ -84,18 +90,21 @@ export default function App() {
 
   // Asynchronous hydration from IndexedDB, localStorage storage events, GitHub sync, and Cloudflare sync
   useEffect(() => {
-    // 1. Asynchronously check IndexedDB
-    loadFromIndexedDB('budget_state').then((idbState) => {
-      if (idbState && idbState.months && idbState.currentMonthId) {
-        setBudgetState((prevState) => {
-          const prevHasExpenses = Object.values(prevState.months).some((m) => m.expenses && m.expenses.length > 0);
-          const idbHasExpenses = Object.values(idbState.months).some((m: any) => m.expenses && m.expenses.length > 0);
-          if (!prevHasExpenses || idbHasExpenses) {
-            saveBudgetState(idbState);
-            return idbState;
-          }
-          return prevState;
-        });
+    // 1. Asynchronously check IndexedDB (fallback if localStorage was empty or IndexedDB is newer)
+    loadFromIndexedDB('budget_state').then((result) => {
+      if (!result) return;
+      const rawState = result.state || result;
+      const sanitized = sanitizeBudgetState(rawState);
+      if (!sanitized) return;
+
+      const hasLocalKey = Boolean(localStorage.getItem(PRIMARY_STORAGE_KEY));
+      const localTs = Number(localStorage.getItem('flowledger_budget_state_last_ts') || 0);
+      const idbTs = Number(result.timestamp || 0);
+
+      // Hydrate if localStorage had no saved state (e.g. standalone PWA launch), or if IndexedDB timestamp is strictly newer
+      if (!hasLocalKey || (idbTs > 0 && idbTs > localTs)) {
+        setBudgetState(sanitized);
+        saveBudgetState(sanitized);
       }
     });
 
@@ -119,7 +128,10 @@ export default function App() {
         channel = new BroadcastChannel('flowledger_pwa_channel');
         channel.onmessage = (evt) => {
           if (evt.data && evt.data.type === 'STATE_UPDATED' && evt.data.state) {
-            setBudgetState(evt.data.state);
+            const sanitized = sanitizeBudgetState(evt.data.state);
+            if (sanitized) {
+              setBudgetState(sanitized);
+            }
           }
         };
       } catch (e) {

@@ -58,6 +58,58 @@ export async function loadFromIndexedDB(key: string): Promise<any | null> {
   }
 }
 
+// Cookie-Based Storage Bridge (Shared on iOS between Mobile Safari Browser & WebClip Standalone PWA)
+function saveToCookie(state: BudgetState): void {
+  if (typeof document === 'undefined') return;
+  try {
+    const compact = JSON.stringify(state);
+    const encoded = encodeURIComponent(compact);
+    if (encoded.length <= 3800) {
+      document.cookie = `flowledger_cookie_data=${encoded}; path=/; max-age=31536000; SameSite=Lax`;
+    } else {
+      const chunkSize = 3500;
+      const chunksCount = Math.ceil(encoded.length / chunkSize);
+      document.cookie = `flowledger_cookie_chunks=${chunksCount}; path=/; max-age=31536000; SameSite=Lax`;
+      for (let i = 0; i < chunksCount; i++) {
+        const chunk = encoded.slice(i * chunkSize, (i + 1) * chunkSize);
+        document.cookie = `flowledger_cookie_chunk_${i}=${chunk}; path=/; max-age=31536000; SameSite=Lax`;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to save to cookie storage:', e);
+  }
+}
+
+function loadFromCookie(): BudgetState | null {
+  if (typeof document === 'undefined') return null;
+  try {
+    const cookies = document.cookie.split('; ').reduce((acc: Record<string, string>, cur) => {
+      const [k, v] = cur.split('=');
+      if (k && v) acc[k.trim()] = v.trim();
+      return acc;
+    }, {});
+
+    if (cookies['flowledger_cookie_data']) {
+      const jsonString = decodeURIComponent(cookies['flowledger_cookie_data']);
+      return sanitizeBudgetState(jsonString);
+    }
+
+    if (cookies['flowledger_cookie_chunks']) {
+      const chunksCount = parseInt(cookies['flowledger_cookie_chunks'], 10);
+      let combinedEncoded = '';
+      for (let i = 0; i < chunksCount; i++) {
+        if (!cookies[`flowledger_cookie_chunk_${i}`]) return null;
+        combinedEncoded += cookies[`flowledger_cookie_chunk_${i}`];
+      }
+      const jsonString = decodeURIComponent(combinedEncoded);
+      return sanitizeBudgetState(jsonString);
+    }
+  } catch (e) {
+    console.error('Failed to load from cookie storage:', e);
+  }
+  return null;
+}
+
 // BroadcastChannel for instant real-time sync between Browser tab and installed PWA window
 let broadcastChannel: BroadcastChannel | null = null;
 if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
@@ -75,6 +127,47 @@ export function notifyDataChanged(state: BudgetState) {
     } catch (e) {
       // Ignore
     }
+  }
+}
+
+export function checkUrlHashForImport(): BudgetState | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const hash = window.location.hash;
+    const search = window.location.search;
+    let rawData: string | null = null;
+
+    if (hash && (hash.includes('import=') || hash.includes('data='))) {
+      const match = hash.match(/(?:import|data)=([^&]+)/);
+      if (match && match[1]) rawData = match[1];
+    } else if (search && (search.includes('import=') || search.includes('data='))) {
+      const match = search.match(/(?:import|data)=([^&]+)/);
+      if (match && match[1]) rawData = match[1];
+    }
+
+    if (rawData) {
+      const jsonString = decodeURIComponent(rawData);
+      const sanitized = sanitizeBudgetState(jsonString);
+      if (sanitized) {
+        saveBudgetState(sanitized);
+        window.history.replaceState(null, '', window.location.pathname);
+        return sanitized;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to parse URL import parameter:', e);
+  }
+  return null;
+}
+
+export function generateAppTransferUrl(state: BudgetState): string {
+  if (typeof window === 'undefined') return '';
+  try {
+    const compactJson = JSON.stringify(state);
+    const encoded = encodeURIComponent(compactJson);
+    return `${window.location.origin}${window.location.pathname}#import=${encoded}`;
+  } catch (e) {
+    return window.location.href;
   }
 }
 
@@ -121,17 +214,27 @@ function sanitizeBudgetState(rawState: any): BudgetState | null {
 export function loadBudgetState(): BudgetState {
   if (typeof window === 'undefined') return INITIAL_BUDGET_STATE;
   try {
-    // Check primary key first, then fall back to backup keys to ensure browser state is retained
+    // Priority 1: Check URL Hash/Search Import parameter (#import=...)
+    const hashImport = checkUrlHashForImport();
+    if (hashImport) return hashImport;
+
+    // Priority 2: Check LocalStorage primary & backup keys
     for (const key of BACKUP_STORAGE_KEYS) {
       const raw = localStorage.getItem(key);
       if (raw) {
         const sanitized = sanitizeBudgetState(raw);
         if (sanitized) {
-          // Re-persist to primary & backup keys
           saveBudgetState(sanitized);
           return sanitized;
         }
       }
+    }
+
+    // Priority 3: Check Shared Cookie Storage (Bridged between Mobile Safari & Installed PWA)
+    const cookieState = loadFromCookie();
+    if (cookieState) {
+      saveBudgetState(cookieState);
+      return cookieState;
     }
 
     saveBudgetState(INITIAL_BUDGET_STATE);
@@ -149,6 +252,9 @@ export function saveBudgetState(state: BudgetState): void {
     localStorage.setItem(PRIMARY_STORAGE_KEY, jsonString);
     localStorage.setItem('flowledger_budget_state_pwa_backup', jsonString);
     localStorage.setItem('flowledger_budget_state_last_ts', Date.now().toString());
+
+    // Save to shared cookies (bridges iOS Safari browser tab & WebClip PWA)
+    saveToCookie(state);
 
     // Asynchronously persist to IndexedDB and post BroadcastChannel update
     saveToIndexedDB('budget_state', state);
@@ -201,3 +307,4 @@ export function exportToCSV(month: BudgetMonth): string {
 
   return [headers.join(','), ...rows].join('\n');
 }
+

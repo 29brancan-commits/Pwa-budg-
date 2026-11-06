@@ -229,21 +229,16 @@ async function executeCloudflareKVFetch(params: {
   }
 
   // 2. Direct fetch to Cloudflare API endpoint
-  let directUrl = `https://api.cloudflare.com/client/v4/accounts/${acc}/storage/kv/namespaces/${kv}/values/${key}`;
-  if (params.action === 'validate') {
-    directUrl = `https://api.cloudflare.com/client/v4/accounts/${acc}/storage/kv/namespaces/${kv}/keys?limit=1&_t=${Date.now()}`;
-  } else if (params.action === 'load') {
-    directUrl = `${directUrl}?_t=${Date.now()}`;
-  }
+  const directUrl = `https://api.cloudflare.com/client/v4/accounts/${acc}/storage/kv/namespaces/${kv}/values/${key}?_t=${Date.now()}`;
 
   try {
     const directRes = await fetch(directUrl, {
-      method: params.method,
+      method: params.action === 'save' ? 'PUT' : 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
-        ...(params.method === 'PUT' ? { 'Content-Type': 'application/json' } : {}),
+        ...(params.action === 'save' ? { 'Content-Type': 'application/json' } : {}),
       },
-      ...(params.method === 'PUT' && params.body ? { body: JSON.stringify(params.body) } : {}),
+      ...(params.action === 'save' && params.body ? { body: JSON.stringify(params.body) } : {}),
     });
 
     let data = null;
@@ -261,12 +256,12 @@ async function executeCloudflareKVFetch(params: {
     try {
       const corsProxyUrl = `https://corsproxy.io/?${encodeURIComponent(directUrl)}`;
       const corsRes = await fetch(corsProxyUrl, {
-        method: params.method,
+        method: params.action === 'save' ? 'PUT' : 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
-          ...(params.method === 'PUT' ? { 'Content-Type': 'application/json' } : {}),
+          ...(params.action === 'save' ? { 'Content-Type': 'application/json' } : {}),
         },
-        ...(params.method === 'PUT' && params.body ? { body: JSON.stringify(params.body) } : {}),
+        ...(params.action === 'save' && params.body ? { body: JSON.stringify(params.body) } : {}),
       });
 
       if (corsRes.ok || corsRes.status === 401 || corsRes.status === 403 || corsRes.status === 404) {
@@ -297,7 +292,8 @@ async function executeCloudflareKVFetch(params: {
 export async function validateCloudflareCredentials(
   accountId: string,
   kvNamespaceId: string,
-  apiToken: string
+  apiToken: string,
+  syncKey: string = 'flowledger_budget_data'
 ): Promise<{ valid: boolean; error?: string }> {
   const acc = (accountId || '').trim();
   const kv = (kvNamespaceId || '').trim();
@@ -313,32 +309,34 @@ export async function validateCloudflareCredentials(
     accountId: acc,
     kvNamespaceId: kv,
     apiToken: token,
+    key: syncKey,
   });
 
   if (result.isNetworkError || result.error) {
     return { valid: false, error: result.error || 'Failed to connect to Cloudflare KV.' };
   }
 
-  if (result.resStatus === 401 || result.resStatus === 403) {
+  // 200 OK (key exists) or 404 Not Found (key not created yet) both confirm valid KV storage permissions!
+  if (result.resStatus === 200 || result.resStatus === 404) {
+    return { valid: true };
+  }
+
+  if (result.resStatus === 401) {
     return {
       valid: false,
-      error: 'Invalid API Token or insufficient permissions. Ensure token has "Workers KV Storage: Edit" permissions.',
+      error: 'Invalid Cloudflare API Token. Please check that you copied the complete token string.',
     };
   }
 
-  if (result.resStatus === 404) {
+  if (result.resStatus === 403) {
     return {
       valid: false,
-      error: 'Account ID or KV Namespace ID not found. Double check your Account ID and KV Namespace ID.',
+      error: 'HTTP 403 Forbidden: Ensure your API Token has "Workers KV Storage: Edit" permission and includes your Cloudflare Account.',
     };
   }
 
-  if (result.resStatus < 200 || result.resStatus >= 300) {
-    const msg = result.data?.errors?.[0]?.message || result.data?.message || `HTTP ${result.resStatus}`;
-    return { valid: false, error: `Cloudflare Error: ${msg}` };
-  }
-
-  return { valid: true };
+  const msg = result.data?.errors?.[0]?.message || result.data?.message || `HTTP ${result.resStatus}`;
+  return { valid: false, error: `Cloudflare Error: ${msg}` };
 }
 
 /**

@@ -10,7 +10,10 @@ import {
 import {
   CloudflareConfig,
   saveDataToCloudflare,
-  loadDataFromCloudflare
+  loadDataFromCloudflare,
+  generateCloudflareSyncShareLink,
+  generateCloudflareSyncToken,
+  parseCloudflareSyncToken
 } from '../utils/cloudflareSync';
 import { APP_VERSION } from '../utils/version';
 import { 
@@ -98,6 +101,12 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
   const [cfSyncKey, setCfSyncKey] = useState(cloudflareConfig.syncKey || 'flowledger_budget_data');
   const [cfAutoSave, setCfAutoSave] = useState(cloudflareConfig.autoSave ?? true);
   const [showCfToken, setShowCfToken] = useState(false);
+
+  // Cloudflare multi-device sync link & token state
+  const [copiedCFLink, setCopiedCFLink] = useState(false);
+  const [copiedCFToken, setCopiedCFToken] = useState(false);
+  const [cfImportTokenStr, setCfImportTokenStr] = useState('');
+  const [cfTokenImportMsg, setCfTokenImportMsg] = useState<string | null>(null);
 
   const [isSavingToCF, setIsSavingToCF] = useState(false);
   const [saveCFSuccess, setSaveCFSuccess] = useState<string | null>(null);
@@ -1057,6 +1066,104 @@ export const DataExportImportModal: React.FC<DataExportImportModalProps> = ({
                 )}
                 <span>{isSavingToCF ? 'Syncing...' : 'Push & Save to Cloudflare'}</span>
               </button>
+            </div>
+
+            {/* Multi-Device 1-Click Sync Link Card */}
+            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-orange-400 text-xs flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>Connect Another Device / Phone</span>
+                </span>
+                <span className="text-[10px] text-slate-400">1-Click Pair</span>
+              </div>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                To load your Cloudflare budget data onto your iPhone Duo, tablet, or another browser, copy this 1-click link and open it once on the other device:
+              </p>
+
+              <div className="flex flex-col sm:flex-row items-stretch gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const currentConfig = handleSaveCloudflareConfig();
+                    const link = generateCloudflareSyncShareLink(currentConfig);
+                    try {
+                      await navigator.clipboard.writeText(link);
+                      setCopiedCFLink(true);
+                      setTimeout(() => setCopiedCFLink(false), 2500);
+                    } catch (e) {
+                      console.error(e);
+                    }
+                  }}
+                  className="flex-1 px-3 py-2 rounded-xl bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/40 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer active:scale-95"
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>{copiedCFLink ? 'Sync Link Copied!' : 'Copy 1-Click Device Sync Link'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const currentConfig = handleSaveCloudflareConfig();
+                    const token = generateCloudflareSyncToken(currentConfig);
+                    try {
+                      await navigator.clipboard.writeText(token);
+                      setCopiedCFToken(true);
+                      setTimeout(() => setCopiedCFToken(false), 2500);
+                    } catch (e) {
+                      console.error(e);
+                    }
+                  }}
+                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-medium flex items-center justify-center gap-1.5 transition cursor-pointer"
+                >
+                  <span>{copiedCFToken ? 'Token Copied!' : 'Copy Sync Token'}</span>
+                </button>
+              </div>
+
+              {/* Paste Sync Token Input */}
+              <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+                <label className="block text-[11px] font-medium text-slate-400">
+                  Or paste Sync Code from another device:
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="CFSYNC:ey..."
+                    value={cfImportTokenStr}
+                    onChange={(e) => setCfImportTokenStr(e.target.value)}
+                    className="flex-1 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-white font-mono text-[11px] focus:outline-none focus:border-orange-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!cfImportTokenStr.trim()) return;
+                      const parsed = parseCloudflareSyncToken(cfImportTokenStr);
+                      if (parsed) {
+                        onUpdateCloudflareConfig(parsed);
+                        setCfEnabled(parsed.enabled);
+                        setCfMode(parsed.mode);
+                        setCfAccountId(parsed.accountId);
+                        setCfKvNamespaceId(parsed.kvNamespaceId);
+                        setCfApiToken(parsed.apiToken);
+                        setCfWorkerEndpoint(parsed.workerEndpoint);
+                        setCfSyncKey(parsed.syncKey);
+                        setCfAutoSave(parsed.autoSave);
+                        setCfTokenImportMsg('Cloudflare Sync paired! Loading data...');
+                        handleLoadFromCloudflareNow();
+                        setTimeout(() => setCfTokenImportMsg(null), 3500);
+                      } else {
+                        setCfTokenImportMsg('Invalid Sync Token code.');
+                      }
+                    }}
+                    className="px-3 py-1 rounded-lg bg-orange-500 text-slate-950 font-bold text-xs hover:bg-orange-400 transition cursor-pointer"
+                  >
+                    Connect
+                  </button>
+                </div>
+                {cfTokenImportMsg && (
+                  <p className="text-[11px] text-orange-400 font-medium pt-0.5">{cfTokenImportMsg}</p>
+                )}
+              </div>
             </div>
 
             {/* Deployment & Wrangler Guide */}

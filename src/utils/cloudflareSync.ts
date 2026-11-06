@@ -25,13 +25,95 @@ export const DEFAULT_CLOUDFLARE_CONFIG: CloudflareConfig = {
   autoSave: true,
 };
 
+/**
+ * Parse Cloudflare sync configuration from URL query parameters (e.g., when clicking 1-Click Sync Link)
+ */
+export function parseCloudflareConfigFromUrl(): CloudflareConfig | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const cfSyncParam = params.get('cf_sync') || params.get('cf_config');
+
+    if (cfSyncParam) {
+      try {
+        const decodedStr = atob(decodeURIComponent(cfSyncParam));
+        const parsed = JSON.parse(decodedStr);
+        if (parsed && typeof parsed === 'object') {
+          const cfg: CloudflareConfig = {
+            ...DEFAULT_CLOUDFLARE_CONFIG,
+            ...parsed,
+            enabled: true,
+          };
+          saveCloudflareConfig(cfg);
+          // Clean URL parameters without reloading page
+          const cleanUrl = window.location.pathname + window.location.hash;
+          window.history.replaceState({}, document.title, cleanUrl);
+          return cfg;
+        }
+      } catch (e) {
+        console.warn('Failed to parse encoded cf_sync parameter:', e);
+      }
+    }
+
+    const cfMode = params.get('cf_mode') as 'kv' | 'worker_endpoint' | null;
+    const cfEndpoint = params.get('cf_endpoint');
+    const cfAccount = params.get('cf_account');
+    const cfKv = params.get('cf_kv');
+    const cfToken = params.get('cf_token');
+    const cfKey = params.get('cf_key');
+
+    if (cfEndpoint || (cfAccount && cfKv) || cfMode) {
+      const cfg: CloudflareConfig = {
+        enabled: true,
+        mode: cfMode || (cfEndpoint ? 'worker_endpoint' : 'kv'),
+        accountId: cfAccount || '',
+        kvNamespaceId: cfKv || '',
+        apiToken: cfToken || '',
+        workerEndpoint: cfEndpoint || '',
+        syncKey: cfKey || 'flowledger_budget_data',
+        autoSave: true,
+      };
+      saveCloudflareConfig(cfg);
+      const cleanUrl = window.location.pathname + window.location.hash;
+      window.history.replaceState({}, document.title, cleanUrl);
+      return cfg;
+    }
+  } catch (e) {
+    console.error('Error checking URL for Cloudflare config:', e);
+  }
+  return null;
+}
+
 export function loadCloudflareConfig(): CloudflareConfig {
   if (typeof window === 'undefined') return DEFAULT_CLOUDFLARE_CONFIG;
   try {
+    // 1. Check if URL has sync parameters passed from another device
+    const urlConfig = parseCloudflareConfigFromUrl();
+    if (urlConfig) return urlConfig;
+
+    // 2. Check localStorage
     const raw = localStorage.getItem(CLOUDFLARE_CONFIG_KEY);
-    if (!raw) return DEFAULT_CLOUDFLARE_CONFIG;
-    const parsed = JSON.parse(raw);
-    return { ...DEFAULT_CLOUDFLARE_CONFIG, ...parsed };
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return { ...DEFAULT_CLOUDFLARE_CONFIG, ...parsed };
+    }
+
+    // 3. Auto-detect if running on Cloudflare Workers / Cloudflare Pages domain (e.g. *.workers.dev)
+    const hostname = window.location.hostname;
+    if (hostname.endsWith('workers.dev') || hostname.endsWith('pages.dev')) {
+      const autoConfig: CloudflareConfig = {
+        ...DEFAULT_CLOUDFLARE_CONFIG,
+        enabled: true,
+        mode: 'worker_endpoint',
+        workerEndpoint: `${window.location.origin}/api/sync`,
+        syncKey: 'flowledger_budget_data',
+        autoSave: true,
+      };
+      saveCloudflareConfig(autoConfig);
+      return autoConfig;
+    }
+
+    return DEFAULT_CLOUDFLARE_CONFIG;
   } catch (e) {
     console.error('Failed to load Cloudflare config:', e);
     return DEFAULT_CLOUDFLARE_CONFIG;
@@ -45,6 +127,67 @@ export function saveCloudflareConfig(config: CloudflareConfig): void {
   } catch (e) {
     console.error('Failed to save Cloudflare config:', e);
   }
+}
+
+/**
+ * Generate a 1-Click shareable URL link containing encoded Cloudflare sync credentials
+ */
+export function generateCloudflareSyncShareLink(config: CloudflareConfig): string {
+  if (typeof window === 'undefined') return '';
+  const payload = {
+    mode: config.mode,
+    accountId: config.accountId,
+    kvNamespaceId: config.kvNamespaceId,
+    apiToken: config.apiToken,
+    workerEndpoint: config.workerEndpoint,
+    syncKey: config.syncKey || 'flowledger_budget_data',
+  };
+
+  const encoded = encodeURIComponent(btoa(JSON.stringify(payload)));
+  const origin = window.location.origin + window.location.pathname;
+  return `${origin}?cf_sync=${encoded}`;
+}
+
+/**
+ * Export Cloudflare config as a compact 1-line Sync Code string (CFSYNC:...)
+ */
+export function generateCloudflareSyncToken(config: CloudflareConfig): string {
+  const payload = {
+    m: config.mode,
+    a: config.accountId,
+    k: config.kvNamespaceId,
+    t: config.apiToken,
+    e: config.workerEndpoint,
+    s: config.syncKey || 'flowledger_budget_data',
+  };
+  return `CFSYNC:${btoa(JSON.stringify(payload))}`;
+}
+
+/**
+ * Import Cloudflare config from a 1-line Sync Code string (CFSYNC:...)
+ */
+export function parseCloudflareSyncToken(tokenStr: string): CloudflareConfig | null {
+  try {
+    const clean = tokenStr.trim();
+    const raw = clean.startsWith('CFSYNC:') ? clean.slice(7) : clean;
+    const parsed = JSON.parse(atob(raw));
+    if (parsed && typeof parsed === 'object') {
+      return {
+        ...DEFAULT_CLOUDFLARE_CONFIG,
+        enabled: true,
+        mode: parsed.m || (parsed.e ? 'worker_endpoint' : 'kv'),
+        accountId: parsed.a || '',
+        kvNamespaceId: parsed.k || '',
+        apiToken: parsed.t || '',
+        workerEndpoint: parsed.e || '',
+        syncKey: parsed.s || 'flowledger_budget_data',
+        autoSave: true,
+      };
+    }
+  } catch (e) {
+    console.error('Invalid Cloudflare sync token string:', e);
+  }
+  return null;
 }
 
 /**
